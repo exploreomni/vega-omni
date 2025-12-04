@@ -20,11 +20,14 @@ export default class CanvasRenderer extends Renderer {
   initialize(el, width, height, origin, scaleFactor, options) {
     this._options = options || {};
 
-    this._canvas = this._options.externalContext
-      ? null
-      : canvas(1, 1, this._options.type); // instantiate a small canvas
+    const { canvas: externalCanvas, externalContext } = this._options;
+    this._canvas = externalContext ? null
+      : externalCanvas || canvas(1, 1, this._options.type);
 
-    if (el && this._canvas) {
+    // Only append to DOM if we have a DOM element and an HTMLCanvasElement.
+    // This ensures we don't attempt to append an OffscreenCanvas to the DOM.
+    if (el && this._canvas && typeof HTMLElement !== 'undefined'
+        && this._canvas instanceof HTMLElement) {
       domClear(el, 0).appendChild(this._canvas);
       this._canvas.setAttribute('class', 'marks');
     }
@@ -57,6 +60,7 @@ export default class CanvasRenderer extends Renderer {
   }
 
   context() {
+    // Return external context if provided, otherwise get context from canvas
     return this._options.externalContext
       || (this._canvas ? this._canvas.getContext('2d') : null);
   }
