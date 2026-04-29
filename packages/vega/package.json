@@ -23,6 +23,7 @@
   "exports": {
     ".": {
       "types": "./index.d.ts",
+      "node": "./build/vega.node.module.js",
       "default": "./build/vega.module.js"
     },
     "./vega-schema.json": "./build/vega-schema.json"
