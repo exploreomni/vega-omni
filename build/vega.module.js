@@ -1,7 +1,8 @@
 function accessor(fn, fields, name) {
-  fn.fields = fields || [];
-  fn.fname = name;
-  return fn;
+  return Object.assign(fn, {
+    fields: fields || [],
+    fname: name
+  });
 }
 function accessorName(fn) {
   return fn == null ? null : fn.fname;
@@ -9,6 +10,7 @@ function accessorName(fn) {
 function accessorFields(fn) {
   return fn == null ? null : fn.fields;
 }
+
 function getter$1(path) {
   return path.length === 1 ? get1(path[0]) : getN(path);
 }
@@ -24,18 +26,24 @@ const getN = path => {
     return obj;
   };
 };
+
 function error(message) {
   throw Error(message);
 }
+
+/**
+ * Splits an access path string into its component parts.
+ * Handles dot notation, bracket notation, and quoted strings.
+ */
 function splitAccessPath(p) {
   const path = [],
     n = p.length;
   let q = null,
     b = 0,
-    s = '',
-    i,
-    j,
-    c;
+    s = '';
+  let i;
+  let j;
+  let c;
   p = p + '';
   function push() {
     path.push(s + p.substring(i, j));
@@ -83,32 +91,34 @@ function splitAccessPath(p) {
   }
   return path;
 }
+
 function field$1(field, name, opt) {
   const path = splitAccessPath(field);
-  field = path.length === 1 ? path[0] : field;
-  return accessor((opt && opt.get || getter$1)(path), [field], name || field);
+  const fieldName = path.length === 1 ? path[0] : field;
+  return accessor((opt && opt.get || getter$1)(path), [fieldName], name || fieldName);
 }
+
 const id = field$1('id');
-const identity$6 = accessor(_ => _, [], 'identity');
+const identity$7 = accessor(_ => _, [], 'identity');
 const zero$3 = accessor(() => 0, [], 'zero');
 const one$2 = accessor(() => 1, [], 'one');
 const truthy = accessor(() => true, [], 'true');
 const falsy = accessor(() => false, [], 'false');
 
 /** Utilities common to vega-interpreter and vega-expression for evaluating expresions */
-
 /** JSON authors are not allowed to set these properties, as these are built-in to the JS Object Prototype and should not be overridden. */
 const DisallowedObjectProperties = new Set([...Object.getOwnPropertyNames(Object.prototype).filter(name => typeof Object.prototype[name] === 'function'), '__proto__']);
-function log$1$1(method, level, input) {
-  const args = [level].concat([].slice.call(input));
-  console[method].apply(console, args); // eslint-disable-line no-console
+
+function log$5(method, level, input) {
+  const args = [level, ...input];
+  console[method](...args); // eslint-disable-line no-console
 }
 const None$2 = 0;
 const Error$1 = 1;
 const Warn = 2;
 const Info = 3;
 const Debug = 4;
-function logger(_, method, handler = log$1$1) {
+function logger (_, method, handler = log$5) {
   let level = _ || None$2;
   return {
     level(_) {
@@ -119,29 +129,38 @@ function logger(_, method, handler = log$1$1) {
         return level;
       }
     },
-    error() {
-      if (level >= Error$1) handler(method || 'error', 'ERROR', arguments);
+    error(...args) {
+      if (level >= Error$1) handler(method || 'error', 'ERROR', args);
       return this;
     },
-    warn() {
-      if (level >= Warn) handler(method || 'warn', 'WARN', arguments);
+    warn(...args) {
+      if (level >= Warn) handler(method || 'warn', 'WARN', args);
       return this;
     },
-    info() {
-      if (level >= Info) handler(method || 'log', 'INFO', arguments);
+    info(...args) {
+      if (level >= Info) handler(method || 'log', 'INFO', args);
       return this;
     },
-    debug() {
-      if (level >= Debug) handler(method || 'log', 'DEBUG', arguments);
+    debug(...args) {
+      if (level >= Debug) handler(method || 'log', 'DEBUG', args);
       return this;
     }
   };
 }
-var isArray = Array.isArray;
+
+/**
+ * Return whether the provided value is an array.
+ */
+const isArray = Array.isArray;
+
 function isObject(_) {
   return _ === Object(_);
 }
-const isLegalKey = key => key !== '__proto__';
+
+const isLegalKey = key => key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
+/** Merges Vega config objects. Signals merged by name (source takes precedence),
+ * legend.layout recursively merged, style fully recursive, others shallow.
+ * Return type is compatible with vega-typings Config. */
 function mergeConfig(...configs) {
   return configs.reduce((out, source) => {
     for (const key in source) {
@@ -164,58 +183,76 @@ function mergeConfig(...configs) {
     return out;
   }, {});
 }
+/** Writes config value to output with optional recursion, rejecting illegal keys that could be used to modify the prototype chain */
 function writeConfig(output, key, value, recurse) {
   if (!isLegalKey(key)) return;
   let k, o;
   if (isObject(value) && !isArray(value)) {
+    const valueObj = value;
     o = isObject(output[key]) ? output[key] : output[key] = {};
-    for (k in value) {
+    for (k in valueObj) {
       if (recurse && (recurse === true || recurse[k])) {
-        writeConfig(o, k, value[k]);
+        writeConfig(o, k, valueObj[k]);
       } else if (isLegalKey(k)) {
-        o[k] = value[k];
+        o[k] = valueObj[k];
       }
     }
   } else {
     output[key] = value;
   }
 }
+/** Merges named object arrays, deduplicating by name. (b takes precedence). */
 function mergeNamed(a, b) {
   if (a == null) return b;
-  const map = {},
-    out = [];
-  function add(_) {
-    if (!map[_.name]) {
-      map[_.name] = 1;
-      out.push(_);
+  if (b == null) return a;
+  const map = {};
+  const out = [];
+  function add(item) {
+    if (!map[item.name]) {
+      map[item.name] = 1;
+      out.push(item);
     }
   }
   b.forEach(add);
   a.forEach(add);
   return out;
 }
+
 function peek$1(array) {
   return array[array.length - 1];
 }
+
+/**
+ * Coerces a value to a number, returning `null` for empty inputs.
+ */
 function toNumber(_) {
   return _ == null || _ === '' ? null : +_;
+}
+
+function isNonEmpty(arr) {
+  return arr.length > 0;
 }
 const exp$2 = sign => x => sign * Math.exp(x);
 const log$4 = sign => x => Math.log(sign * x);
 const symlog$1 = c => x => Math.sign(x) * Math.log1p(Math.abs(x / c));
 const symexp = c => x => Math.sign(x) * Math.expm1(Math.abs(x)) * c;
 const pow$4 = exponent => x => x < 0 ? -Math.pow(-x, exponent) : Math.pow(x, exponent);
+// Internal wrappers to adapt utility functions to TransformFn signature
+// Unlike toNumber, coerceNumber always returns a number (never null)
+const coerceNumber = x => toNumber(x) ?? 0;
+const identity$6 = x => x;
 function pan(domain, delta, lift, ground) {
+  if (!isNonEmpty(domain)) error('Domain array must not be empty');
   const d0 = lift(domain[0]),
     d1 = lift(peek$1(domain)),
     dd = (d1 - d0) * delta;
   return [ground(d0 - dd), ground(d1 - dd)];
 }
 function panLinear(domain, delta) {
-  return pan(domain, delta, toNumber, identity$6);
+  return pan(domain, delta, coerceNumber, identity$6);
 }
 function panLog(domain, delta) {
-  var sign = Math.sign(domain[0]);
+  const sign = Math.sign(domain[0]);
   return pan(domain, delta, log$4(sign), exp$2(sign));
 }
 function panPow(domain, delta, exponent) {
@@ -225,13 +262,14 @@ function panSymlog(domain, delta, constant) {
   return pan(domain, delta, symlog$1(constant), symexp(constant));
 }
 function zoom$1(domain, anchor, scale, lift, ground) {
+  if (!isNonEmpty(domain)) error('Domain array must not be empty');
   const d0 = lift(domain[0]),
     d1 = lift(peek$1(domain)),
     da = anchor != null ? lift(anchor) : (d0 + d1) / 2;
   return [ground(da + (d0 - da) * scale), ground(da + (d1 - da) * scale)];
 }
 function zoomLinear(domain, anchor, scale) {
-  return zoom$1(domain, anchor, scale, toNumber, identity$6);
+  return zoom$1(domain, anchor, scale, coerceNumber, identity$6);
 }
 function zoomLog(domain, anchor, scale) {
   const sign = Math.sign(domain[0]);
@@ -243,13 +281,15 @@ function zoomPow(domain, anchor, scale, exponent) {
 function zoomSymlog(domain, anchor, scale, constant) {
   return zoom$1(domain, anchor, scale, symlog$1(constant), symexp(constant));
 }
+
 function quarter(date) {
   return 1 + ~~(new Date(date).getMonth() / 3);
 }
 function utcquarter(date) {
   return 1 + ~~(new Date(date).getUTCMonth() / 3);
 }
-function array$5(_) {
+
+function array$5 (_) {
   return _ != null ? isArray(_) ? _ : [_] : [];
 }
 
@@ -272,26 +312,36 @@ function clampRange(range, min, max) {
   span = hi - lo;
   return span >= max - min ? [min, max] : [lo = Math.min(Math.max(lo, min), max - span), lo + span];
 }
-function isFunction(_) {
-  return typeof _ === 'function';
+
+/**
+ * Verify that the value is a function-like object.
+ */
+function isFunction(value) {
+  return typeof value === 'function';
 }
+
 const DESCENDING = 'descending';
-function compare$1(fields, orders, opt) {
-  opt = opt || {};
-  orders = array$5(orders) || [];
+function compare$1(inputFields, inputOrders, inputOpt) {
+  const opt = inputOpt || {};
+  const orders = array$5(inputOrders) || [];
   const ord = [],
     get = [],
     fmap = {},
     gen = opt.comparator || comparator;
-  array$5(fields).forEach((f, i) => {
+  array$5(inputFields).forEach((f, i) => {
     if (f == null) return;
     ord.push(orders[i] === DESCENDING ? -1 : 1);
-    get.push(f = isFunction(f) ? f : field$1(f, null, opt));
-    (accessorFields(f) || []).forEach(_ => fmap[_] = 1);
+    const accessor = isFunction(f) ? f : field$1(f, undefined, opt);
+    get.push(accessor);
+    (accessorFields(accessor) || []).forEach(_ => fmap[_] = 1);
   });
   return get.length === 0 ? null : accessor(gen(get, ord), Object.keys(fmap));
 }
-const ascending$2 = (u, v) => (u < v || u == null) && v != null ? -1 : (u > v || v == null) && u != null ? 1 : (v = v instanceof Date ? +v : v, u = u instanceof Date ? +u : u) !== u && v === v ? -1 : v !== v && u === u ? 1 : 0;
+const ascending$2 = (_u, _v) => {
+  let u = _u;
+  let v = _v;
+  return (u < v || u == null) && v != null ? -1 : (u > v || v == null) && u != null ? 1 : (v = v instanceof Date ? +v : v, u = u instanceof Date ? +u : u) !== u && v === v ? -1 : v !== v && u === u ? 1 : 0;
+};
 const comparator = (fields, orders) => fields.length === 1 ? compare1(fields[0], orders[0]) : compareN(fields, orders, fields.length);
 const compare1 = (field, order) => function (a, b) {
   return ascending$2(field(a), field(b)) * order;
@@ -309,42 +359,43 @@ const compareN = (fields, orders, n) => {
     return c * orders[i];
   };
 };
-function constant$5(_) {
+
+function constant$5 (_) {
   return isFunction(_) ? _ : () => _;
 }
+
 function debounce(delay, handler) {
-  let tid;
+  let tid = null;
   return e => {
     if (tid) clearTimeout(tid);
     tid = setTimeout(() => (handler(e), tid = null), delay);
   };
 }
-function extend$1(_) {
-  for (let x, k, i = 1, len = arguments.length; i < len; ++i) {
-    x = arguments[i];
-    for (k in x) {
-      _[k] = x[k];
+
+function extend$1(_, ...args) {
+  for (const arg of args) {
+    for (const k in arg) {
+      _[k] = arg[k];
     }
   }
   return _;
 }
 
 /**
- * Return an array with minimum and maximum values, in the
- * form [min, max]. Ignores null, undefined, and NaN values.
+ * Implementation signature: Handles both cases at runtime.
+ * Returns T | U since the actual type depends on whether an accessor function is provided.
  */
 function extent(array, f) {
   let i = 0,
-    n,
-    v,
-    min,
-    max;
+    n;
+  let v;
+  let min;
+  let max;
   if (array && (n = array.length)) {
     if (f == null) {
       // find first valid value
       for (v = array[i]; i < n && (v == null || v !== v); v = array[++i]);
       min = max = v;
-
       // visit all other values
       for (; i < n; ++i) {
         v = array[i];
@@ -358,7 +409,6 @@ function extent(array, f) {
       // find first valid value
       for (v = f(array[i]); i < n && (v == null || v !== v); v = f(array[++i]));
       min = max = v;
-
       // visit all other values
       for (; i < n; ++i) {
         v = f(array[i]);
@@ -372,15 +422,20 @@ function extent(array, f) {
   }
   return [min, max];
 }
+
+/**
+ * Implementation signature: Handles both cases at runtime.
+ */
 function extentIndex(array, f) {
   const n = array.length;
   let i = -1,
-    a,
-    b,
-    c,
     u,
     v;
+  let a;
+  let b;
+  let c;
   if (f == null) {
+    // Find first non-null value to initialize min/max
     while (++i < n) {
       b = array[i];
       if (b != null && b >= b) {
@@ -390,6 +445,9 @@ function extentIndex(array, f) {
     }
     if (i === n) return [-1, -1];
     u = v = i;
+    // At this point, a and c are guaranteed to be non-null/non-undefined
+    // because the initialization loop above found a valid value before reaching here.
+    // Non-null assertions (a!, c!) are used in the loop below.
     while (++i < n) {
       b = array[i];
       if (b != null) {
@@ -404,6 +462,7 @@ function extentIndex(array, f) {
       }
     }
   } else {
+    // Find first non-null value to initialize min/max
     while (++i < n) {
       b = f(array[i], i, array);
       if (b != null && b >= b) {
@@ -413,6 +472,9 @@ function extentIndex(array, f) {
     }
     if (i === n) return [-1, -1];
     u = v = i;
+    // At this point, a and c are guaranteed to be non-null/non-undefined
+    // because the initialization loop above found a valid value before reaching here.
+    // Non-null assertions (a!, c!) are used in the loop below.
     while (++i < n) {
       b = f(array[i], i, array);
       if (b != null) {
@@ -429,26 +491,28 @@ function extentIndex(array, f) {
   }
   return [u, v];
 }
-function has$1(object, property) {
+
+function hasOwnProperty(object, property) {
   return Object.hasOwn(object, property);
 }
+
 const NULL = {};
 function fastmap(input) {
   let obj = {},
     test;
-  function has$1$1(key) {
-    return has$1(obj, key) && obj[key] !== NULL;
+  function has(key) {
+    return hasOwnProperty(obj, key) && obj[key] !== NULL;
   }
   const map = {
     size: 0,
     empty: 0,
     object: obj,
-    has: has$1$1,
+    has: has,
     get(key) {
-      return has$1$1(key) ? obj[key] : undefined;
+      return has(key) ? obj[key] : undefined;
     },
     set(key, value) {
-      if (!has$1$1(key)) {
+      if (!has(key)) {
         ++map.size;
         if (obj[key] === NULL) --map.empty;
       }
@@ -456,7 +520,7 @@ function fastmap(input) {
       return this;
     },
     delete(key) {
-      if (has$1$1(key)) {
+      if (has(key)) {
         --map.size;
         ++map.empty;
         obj[key] = NULL;
@@ -467,9 +531,10 @@ function fastmap(input) {
       map.size = map.empty = 0;
       map.object = obj = {};
     },
-    test(_) {
+    /** See the FastMap interface for the expected return type, which depends on whether a function is provided */
+    test(fn) {
       if (arguments.length) {
-        test = _;
+        test = fn;
         return map;
       } else {
         return test;
@@ -495,28 +560,33 @@ function fastmap(input) {
   });
   return map;
 }
-function flush(range, value, threshold, left, right, center) {
+
+/**
+ * Selects one of three values (left, right, or center) based on whether
+ * a value is within a threshold distance of a range's endpoints.
+ * @template T The type of value to return (can be any type - string, number, object, etc.)
+ */
+function flush (range, value, threshold, left, right, center) {
   if (!threshold && threshold !== 0) return center;
   const t = +threshold;
   let a = range[0],
     b = peek$1(range),
     l;
-
+  if (b === undefined) return center;
   // swap endpoints if range is reversed
   if (b < a) {
     l = a;
     a = b;
     b = l;
   }
-
   // compare value to endpoints
   l = Math.abs(value - a);
   const r = Math.abs(b - value);
-
   // adjust if value is within threshold distance of endpoint
   return l < r && l <= t ? left : r <= t ? right : center;
 }
-function inherits(child, parent, members) {
+
+function inherits (child, parent, members) {
   const proto = child.prototype = Object.create(parent.prototype);
   Object.defineProperty(proto, 'constructor', {
     value: child,
@@ -545,43 +615,63 @@ function inrange(value, range, left, right) {
   right = right === undefined || right;
   return (left ? r0 <= value : r0 < value) && (right ? value <= r1 : value < r1);
 }
-function isBoolean$1(_) {
-  return typeof _ === 'boolean';
+
+/**
+ * Determine if the value is a boolean primitive.
+ */
+function isBoolean$1(value) {
+  return typeof value === 'boolean';
 }
-function isDate$1(_) {
-  return Object.prototype.toString.call(_) === '[object Date]';
+
+/**
+ * Check if the value is an actual Date object.
+ */
+function isDate$1(value) {
+  return Object.prototype.toString.call(value) === '[object Date]';
 }
-function isIterable(_) {
-  return _ && isFunction(_[Symbol.iterator]);
+
+/**
+ * Test if the value exposes the iterator protocol via `Symbol.iterator`.
+ */
+function isIterable(value) {
+  return value != null && isFunction(value[Symbol.iterator]);
 }
-function isNumber$1(_) {
-  return typeof _ === 'number';
+
+/**
+ * Identify if the value is a number primitive.
+ */
+function isNumber$1(value) {
+  return typeof value === 'number';
 }
-function isRegExp(_) {
-  return Object.prototype.toString.call(_) === '[object RegExp]';
+
+/**
+ * Confirm whether the value is a `RegExp` object.
+ */
+function isRegExp(value) {
+  return Object.prototype.toString.call(value) === '[object RegExp]';
 }
+
 function isString(_) {
   return typeof _ === 'string';
 }
+
 function key(fields, flat, opt) {
-  if (fields) {
-    fields = flat ? array$5(fields).map(f => f.replace(/\\(.)/g, '$1')) : array$5(fields);
-  }
-  const len = fields && fields.length,
+  const processedFields = fields ? flat ? array$5(fields).map(f => f.replace(/\\(.)/g, '$1')) : array$5(fields) : undefined;
+  const len = processedFields?.length,
     gen = opt && opt.get || getter$1,
     map = f => gen(flat ? [f] : splitAccessPath(f));
   let fn;
-  if (!len) {
+  if (!len || !processedFields) {
     fn = function () {
       return '';
     };
   } else if (len === 1) {
-    const get = map(fields[0]);
+    const get = map(processedFields[0]);
     fn = function (_) {
       return '' + get(_);
     };
   } else {
-    const get = fields.map(map);
+    const get = processedFields.map(map);
     fn = function (_) {
       let s = '' + get[0](_),
         i = 0;
@@ -589,18 +679,22 @@ function key(fields, flat, opt) {
       return s;
     };
   }
-  return accessor(fn, fields, 'key');
+  return accessor(fn, processedFields, 'key');
 }
-function lerp(array, frac) {
+
+function lerp (array, frac) {
   const lo = array[0],
     hi = peek$1(array),
     f = +frac;
+  if (hi === undefined) return lo;
   return !f ? lo : f === 1 ? hi : lo + f * (hi - lo);
 }
-const DEFAULT_MAX_SIZE = 10000;
 
-// adapted from https://github.com/dominictarr/hashlru/ (MIT License)
-function lruCache(maxsize) {
+const DEFAULT_MAX_SIZE = 10000;
+/**
+ * Adapted from https://github.com/dominictarr/hashlru/ (MIT License)
+ */
+function lruCache (maxsize) {
   maxsize = +maxsize || DEFAULT_MAX_SIZE;
   let curr, prev, size;
   const clear = () => {
@@ -619,17 +713,26 @@ function lruCache(maxsize) {
   clear();
   return {
     clear,
-    has: key => has$1(curr, key) || has$1(prev, key),
-    get: key => has$1(curr, key) ? curr[key] : has$1(prev, key) ? update(key, prev[key]) : undefined,
-    set: (key, value) => has$1(curr, key) ? curr[key] = value : update(key, value)
+    has: key => hasOwnProperty(curr, key) || hasOwnProperty(prev, key),
+    get: key => hasOwnProperty(curr, key) ? curr[key] : hasOwnProperty(prev, key) ? update(key, prev[key]) : undefined,
+    set: (key, value) => hasOwnProperty(curr, key) ? curr[key] = value : update(key, value)
   };
+}
+
+/** Type guard for Array or TypedArray constructors */
+function isArrayConstructor(ctor) {
+  // isView is a cheap check for if the constructor is a TypedArray
+  // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/isView
+  return ctor === Array || typeof ctor === 'function' && ctor.prototype && ArrayBuffer.isView(ctor.prototype);
 }
 function merge$3(compare, array0, array1, output) {
   const n0 = array0.length,
     n1 = array1.length;
   if (!n1) return array0;
   if (!n0) return array1;
-  const merged = output || new array0.constructor(n0 + n1);
+  // Use array constructor to preserve type (Array or TypedArray), fallback to Array if invalid
+  const ctor = array0.constructor;
+  const merged = output || (isArrayConstructor(ctor) ? new ctor(n0 + n1) : new Array(n0 + n1));
   let i0 = 0,
     i1 = 0,
     i = 0;
@@ -644,11 +747,19 @@ function merge$3(compare, array0, array1, output) {
   }
   return merged;
 }
+
+/**
+ * Repeat a string a specified number of times.
+ */
 function repeat(str, reps) {
   let s = '';
   while (--reps >= 0) s += str;
   return s;
 }
+
+/**
+ * Pads a string to a specified length with a padding character.
+ */
 function pad$2(str, length, padchar, align) {
   const c = padchar || ' ',
     s = str + '',
@@ -660,32 +771,60 @@ function pad$2(str, length, padchar, align) {
  * Return the numerical span of an array: the difference between
  * the last and first values.
  */
-function span(array) {
+function span (array) {
   return array && peek$1(array) - array[0] || 0;
 }
-function $(x) {
-  return isArray(x) ? `[${x.map(v => v === null ? 'null' : $(v))}]` : isObject(x) || isString(x) ?
+
+/**
+ * Converts a value to its string representation.
+ * Arrays are formatted as comma-separated values in brackets.
+ * Objects and strings are converted to JSON format with Unicode line/paragraph
+ * separator characters properly escaped for JavaScript compatibility.
+ */
+function stringValue(x) {
+  return isArray(x) ? `[${x.map(v => v === null ? 'null' : stringValue(v))}]` : isObject(x) || isString(x) ?
   // Output valid JSON and JS source strings.
   // See https://github.com/judofyr/timeless/blob/master/posts/json-isnt-a-javascript-subset.md
   JSON.stringify(x).replaceAll('\u2028', '\\u2028').replaceAll('\u2029', '\\u2029') : x;
 }
+
+/**
+ * Coerces a value to a boolean, matching Vega signal semantics.
+ * Strings like `'false'` or `'0'` map to `false`; `null` and empty strings map to `null`.
+ */
 function toBoolean(_) {
   return _ == null || _ === '' ? null : !_ || _ === 'false' || _ === '0' ? false : !!_;
 }
-const defaultParser = _ => isNumber$1(_) ? _ : isDate$1(_) ? _ : Date.parse(_);
+
+const defaultParser = _ =>
+// Date.parse accepts string but will implicitly coerce the input value.
+// Type assertion allows Date.parse to handle its own coercion behavior.
+isNumber$1(_) ? _ : isDate$1(_) ? _ : Date.parse(_);
+/**
+ * Coerces a value to a Date-like value using an optional parser.
+ */
 function toDate(_, parser) {
   parser = parser || defaultParser;
   return _ == null || _ === '' ? null : parser(_);
 }
+
+/**
+ * Coerces a value to a string, returning `null` for empty inputs.
+ */
 function toString(_) {
   return _ == null || _ === '' ? null : _ + '';
 }
+
 function toSet(_) {
   const s = {},
     n = _.length;
-  for (let i = 0; i < n; ++i) s[_[i]] = true;
+  for (let i = 0; i < n; ++i) s[_[i] + ''] = true;
   return s;
 }
+
+/**
+ * Truncate a string to a specified length with an optional ellipsis.
+ */
 function truncate$1(str, length, align, ellipsis) {
   const e = ellipsis != null ? ellipsis : '\u2026',
     s = str + '',
@@ -693,6 +832,11 @@ function truncate$1(str, length, align, ellipsis) {
     l = Math.max(0, length - e.length);
   return n <= length ? s : align === 'left' ? e + s.slice(n - l) : align === 'center' ? s.slice(0, Math.ceil(l / 2)) + e + s.slice(n - ~~(l / 2)) : s.slice(0, l) + e;
 }
+
+/**
+ * Implementation signature: Handles both cases at runtime.
+ * Visitor accepts T | U because the actual type depends on whether filter is provided.
+ */
 function visitArray(array, filter, visitor) {
   if (array) {
     if (filter) {
@@ -2242,7 +2386,7 @@ function timeUnits(units) {
   // check validity
   if (!u.length) error('Missing time unit.');
   u.forEach(unit => {
-    if (has$1(UNITS, unit)) {
+    if (hasOwnProperty(UNITS, unit)) {
       m[unit] = 1;
     } else {
       error(`Invalid time unit: ${unit}.`);
@@ -2513,6 +2657,100 @@ function bin$1(opt) {
     units = Milli;
     step = Math.max(tickStep(ext[0], ext[1], max), 1);
   }
+  return {
+    units,
+    step
+  };
+}
+
+// Adapted from the time-grain-detector package by Paul Rosenzweig (ISC license).
+const localGetters = {
+  [YEAR]: d => d.getFullYear(),
+  [MONTH]: d => d.getMonth(),
+  [DATE]: d => d.getDate(),
+  [DAY]: d => d.getDay(),
+  [HOURS]: d => d.getHours(),
+  [MINUTES]: d => d.getMinutes(),
+  [SECONDS]: d => d.getSeconds(),
+  [MILLISECONDS]: d => d.getMilliseconds()
+};
+const utcGetters = {
+  [YEAR]: d => d.getUTCFullYear(),
+  [MONTH]: d => d.getUTCMonth(),
+  [DATE]: d => d.getUTCDate(),
+  [DAY]: d => d.getUTCDay(),
+  [HOURS]: d => d.getUTCHours(),
+  [MINUTES]: d => d.getUTCMinutes(),
+  [SECONDS]: d => d.getUTCSeconds(),
+  [MILLISECONDS]: d => d.getUTCMilliseconds()
+};
+const grains = [{
+  units: [YEAR, MONTH, DATE, HOURS, MINUTES, SECONDS, MILLISECONDS],
+  step: 1,
+  aligned: () => true
+}, {
+  units: [YEAR, MONTH, DATE, HOURS, MINUTES, SECONDS],
+  step: 1,
+  aligned: (dates, g) => dates.every(d => g[MILLISECONDS](d) === 0)
+}, {
+  units: [YEAR, MONTH, DATE, HOURS, MINUTES],
+  step: 1,
+  aligned: (dates, g) => dates.every(d => g[SECONDS](d) === 0)
+}, {
+  units: [YEAR, MONTH, DATE, HOURS, MINUTES],
+  step: 5,
+  aligned: (dates, g) => dates.every(d => g[MINUTES](d) % 5 === 0)
+}, {
+  units: [YEAR, MONTH, DATE, HOURS, MINUTES],
+  step: 10,
+  aligned: (dates, g) => dates.every(d => g[MINUTES](d) % 10 === 0)
+}, {
+  units: [YEAR, MONTH, DATE, HOURS],
+  step: 1,
+  aligned: (dates, g) => dates.every(d => g[MINUTES](d) === 0)
+}, {
+  units: [YEAR, MONTH, DATE],
+  step: 1,
+  aligned: (dates, g) => dates.every(d => g[HOURS](d) === 0)
+}, {
+  units: [YEAR, WEEK],
+  step: 1,
+  skippable: true,
+  aligned: (dates, g) => new Set(dates.map(d => g[DAY](d))).size === 1
+}, {
+  units: [YEAR, MONTH],
+  step: 1,
+  aligned: (dates, g) => dates.every(d => g[DATE](d) === 1)
+}, {
+  units: [YEAR, MONTH],
+  step: 3,
+  aligned: (dates, g) => dates.every(d => g[MONTH](d) % 3 === 0)
+}, {
+  units: [YEAR],
+  step: 1,
+  aligned: (dates, g) => dates.every(d => g[MONTH](d) === 0)
+}, {
+  units: [YEAR],
+  step: 10,
+  aligned: (dates, g) => dates.every(d => g[YEAR](d) % 10 === 0)
+}, {
+  aligned: () => false
+}];
+function detectTimeUnits(data, field, utc) {
+  const getters = utc ? utcGetters : localGetters;
+  const dates = data.map(t => {
+    const v = field(t),
+      d = new Date(v);
+    if (Number.isNaN(+d)) error(`Invalid date: ${v}`);
+    return d;
+  });
+  const mismatch = grains.findIndex(g => !g.aligned(dates, getters)),
+    required = grains.findIndex(g => !g.skippable && !g.aligned(dates, getters)),
+    index = required > mismatch + 1 ? required : mismatch;
+  const {
+    units,
+    step
+  } = grains[index - 1];
   return {
     units,
     step
@@ -3384,7 +3622,7 @@ async function sanitize(uri, options) {
   let isFile, loadFile, base;
   const isAllowed = allowed_re.test(uri.replace(whitespace_re, ''));
   if (uri == null || typeof uri !== 'string' || !isAllowed) {
-    error('Sanitize failure, invalid URI: ' + $(uri));
+    error('Sanitize failure, invalid URI: ' + stringValue(uri));
   }
   const hasProtocol = protocol_re.test(uri);
 
@@ -3487,7 +3725,7 @@ const typeParsers = {
   number: toNumber,
   date: toDate,
   string: toString,
-  unknown: identity$6
+  unknown: identity$7
 };
 const typeTests = [isBoolean, isInteger, isNumber, isDate];
 const typeList = ['boolean', 'integer', 'number', 'date'];
@@ -3526,7 +3764,7 @@ function delimitedFormat(delimiter) {
 }
 function dsv(data, format) {
   if (format.header) {
-    data = format.header.map($).join(format.delimiter) + '\n' + data;
+    data = format.header.map(stringValue).join(format.delimiter) + '\n' + data;
   }
   return dsvFormat(format.delimiter).parse(data + '');
 }
@@ -3535,7 +3773,7 @@ function isBuffer(_) {
   return typeof Buffer === 'function' && isFunction(Buffer.isBuffer) ? Buffer.isBuffer(_) : false;
 }
 function json(data, format) {
-  const prop = format && format.property ? field$1(format.property) : identity$6;
+  const prop = format && format.property ? field$1(format.property) : identity$7;
   return isObject(data) && !isBuffer(data) ? parseJSON(prop(data), format) : prop(JSON.parse(data));
 }
 json.responseType = 'json';
@@ -3578,7 +3816,7 @@ function formats$1(name, reader) {
     format$2[name] = reader;
     return this;
   } else {
-    return has$1(format$2, name) ? format$2[name] : null;
+    return hasOwnProperty(format$2, name) ? format$2[name] : null;
   }
 }
 function responseType(type) {
@@ -3591,7 +3829,7 @@ function read(data, schema, timeParser, utcParser) {
   if (!reader) error('Unknown data format type: ' + schema.type);
   data = reader(data, schema);
   if (schema.parse) parse$6(data, schema.parse, timeParser, utcParser);
-  if (has$1(data, 'columns')) delete data.columns;
+  if (hasOwnProperty(data, 'columns')) delete data.columns;
   return data;
 }
 function parse$6(data, types, timeParser, utcParser) {
@@ -3638,7 +3876,7 @@ const loader = loaderFactory(null // no file system access
 );
 
 function UniqueList(idFunc) {
-  const $ = idFunc || identity$6,
+  const $ = idFunc || identity$7,
     list = [],
     ids = {};
   list.add = _ => {
@@ -4326,7 +4564,7 @@ function stream(filter, apply, receive) {
 }
 EventStream.prototype = {
   _filter: truthy,
-  _apply: identity$6,
+  _apply: identity$7,
   targets() {
     return this._targets || (this._targets = UniqueList(id));
   },
@@ -5583,7 +5821,7 @@ Dataflow.prototype = {
    */
   warn: logMethod('warn'),
   /**
-   * Logs a information message. By default, logged messages are written to
+   * Logs an information message. By default, logged messages are written to
    * console output. The message will only be logged if the current log level is
    * high enough to permit information messages.
    */
@@ -5699,7 +5937,7 @@ function definition$1(type) {
 }
 function transform$2(type) {
   type = type && type.toLowerCase();
-  return has$1(transforms, type) ? transforms[type] : null;
+  return hasOwnProperty(transforms, type) ? transforms[type] : null;
 }
 
 function* numbers$1(values, valueof) {
@@ -6904,29 +7142,29 @@ const AggregateOps = {
   },
   variance: {
     init: m => m.dev = 0,
-    value: m => m.valid > 1 ? m.dev / (m.valid - 1) : undefined,
+    value: m => m.valid > 1 ? Math.max(0, m.dev) / (m.valid - 1) : undefined,
     add: (m, v) => m.dev += m.mean_d * (v - m.mean),
     rem: (m, v) => m.dev -= m.mean_d * (v - m.mean),
     req: ['mean'],
     idx: 1
   },
   variancep: {
-    value: m => m.valid > 1 ? m.dev / m.valid : undefined,
+    value: m => m.valid ? Math.max(0, m.dev) / m.valid : undefined,
     req: ['variance'],
     idx: 2
   },
   stdev: {
-    value: m => m.valid > 1 ? Math.sqrt(m.dev / (m.valid - 1)) : undefined,
+    value: m => m.valid > 1 ? Math.sqrt(Math.max(0, m.dev) / (m.valid - 1)) : undefined,
     req: ['variance'],
     idx: 2
   },
   stdevp: {
-    value: m => m.valid > 1 ? Math.sqrt(m.dev / m.valid) : undefined,
+    value: m => m.valid ? Math.sqrt(Math.max(0, m.dev) / m.valid) : undefined,
     req: ['variance'],
     idx: 2
   },
   stderr: {
-    value: m => m.valid > 1 ? Math.sqrt(m.dev / (m.valid * (m.valid - 1))) : undefined,
+    value: m => m.valid > 1 ? Math.sqrt(Math.max(0, m.dev) / (m.valid * (m.valid - 1))) : undefined,
     req: ['variance'],
     idx: 2
   },
@@ -7080,7 +7318,7 @@ function set$3(t) {
   return t;
 }
 function compileMeasures(agg, field) {
-  const get = field || identity$6,
+  const get = field || identity$7,
     ops = resolve(agg),
     out = agg.slice().sort(compareIndex);
   function ctr(cell) {
@@ -7152,7 +7390,7 @@ prototype$1.distinct = function (get) {
     s;
   while (--n >= 0) {
     s = get(v[n]) + '';
-    if (!has$1(map, s)) {
+    if (!hasOwnProperty(map, s)) {
       map[s] = 1;
       ++count;
     }
@@ -7652,8 +7890,8 @@ inherits(Bin, Transform, {
       t[b0] = v;
       // maximum bin value (exclusive)
       // use convoluted math for better floating point agreement
-      // see https://github.com/vega/vega/issues/830
-      // infinite values propagate through this formula! #2227
+      // see vega/vega#830
+      // infinite values propagate through this formula! vega/vega#2227
       t[b1] = v == null ? null : start + step * (1 + (v - start) / step);
     } : t => t[b0] = bins(t));
     return pulse.modifies(band ? as : b0);
@@ -7679,7 +7917,7 @@ inherits(Bin, Transform, {
       return v == null ? null : v < start ? -Infinity : v > stop ? +Infinity : (v = Math.max(start, Math.min(v, stop - step)), start + step * Math.floor(EPSILON$1 + (v - start) / step));
     };
     f.start = start;
-    f.stop = bins.stop;
+    f.stop = stop;
     f.step = step;
     return this.value = accessor(f, accessorFields(field), _.name || 'bin_' + accessorName(field));
   }
@@ -7979,7 +8217,7 @@ const DISTRIBUTIONS = 'distributions',
  */
 function parse$4(def, data) {
   const func = def[FUNCTION];
-  if (!has$1(Distributions, func)) {
+  if (!hasOwnProperty(Distributions, func)) {
     error('Unknown distribution function: ' + func);
   }
   const d = Distributions[func]();
@@ -8249,7 +8487,7 @@ inherits(DotBin, Transform, {
       return pulse; // early exit
     }
     const source = pulse.materialize(pulse.SOURCE).source,
-      groups = partition$1$1(pulse.source, _.groupby, identity$6),
+      groups = partition$1$1(pulse.source, _.groupby, identity$7),
       smooth = _.smooth || false,
       field = _.field,
       step = _.step || autostep(source, field),
@@ -8439,7 +8677,7 @@ inherits(Facet$1, Transform, {
   // parent argument provided by PreFacet subclass
   subflow(key, flow, pulse, parent) {
     const flows = this.value;
-    let sf = has$1(flows, key) && flows[key],
+    let sf = hasOwnProperty(flows, key) && flows[key],
       df,
       p;
     if (!sf) {
@@ -10001,6 +10239,10 @@ TimeUnit.Definition = {
     'type': 'date',
     'array': true
   }, {
+    'name': 'inferUnits',
+    'type': 'boolean',
+    'default': false
+  }, {
     'name': 'timezone',
     'type': 'enum',
     'default': 'local',
@@ -10052,12 +10294,15 @@ inherits(TimeUnit, Transform, {
   },
   _floor(_, pulse) {
     const utc = _.timezone === 'utc';
+    if (_.inferUnits && (_.units || _.step != null || _.maxbins != null || _.extent)) {
+      pulse.dataflow.warn('TimeUnit inferUnits overrides units, step, maxbins and extent.');
+    }
 
     // get parameters
     const {
       units,
       step
-    } = _.units ? {
+    } = _.inferUnits ? detectTimeUnits(pulse.materialize(pulse.SOURCE).source, _.field, utc) : _.units ? {
       units: _.units,
       step: _.step || 1
     } : bin$1({
@@ -10297,7 +10542,7 @@ function WindowState(_) {
     outputs.push(name);
 
     // Window operation
-    if (has$1(WindowOps, op)) {
+    if (hasOwnProperty(WindowOps, op)) {
       windows.push(WindowOp(op, field, param, name));
     }
 
@@ -10536,11 +10781,22 @@ function processPartition(list, state, cmp, _) {
     state.update(w, data[i]);
   }
 }
+function clamp$1(x, lo, hi) {
+  return x < lo ? lo : x > hi ? hi : x;
+}
 function setWindow(w, f, i, n) {
   w.p0 = w.i0;
   w.p1 = w.i1;
-  w.i0 = f[0] == null ? 0 : Math.max(0, i - Math.abs(f[0]));
-  w.i1 = f[1] == null ? n : Math.min(n, i + Math.abs(f[1]) + 1);
+
+  // f[0]: start offset (inclusive). null => unbounded (0)
+  // Use the SIGNED offset relative to i.
+  const start = f[0] == null ? 0 : i + f[0];
+
+  // f[1]: end offset (inclusive in “row terms”), so we +1 for exclusive bound.
+  // null => unbounded (n)
+  const endExclusive = f[1] == null ? n : i + f[1] + 1;
+  w.i0 = clamp$1(start, 0, n);
+  w.i1 = clamp$1(endExclusive, 0, n);
   w.index = i;
 }
 
@@ -10556,47 +10812,47 @@ function adjustRange(w, bisect) {
 }
 
 var tx = /*#__PURE__*/Object.freeze({
-  __proto__: null,
-  aggregate: Aggregate$1,
-  bin: Bin,
-  collect: Collect$1,
-  compare: Compare$1,
-  countpattern: CountPattern,
-  cross: Cross,
-  density: Density,
-  dotbin: DotBin,
-  expression: Expression$1,
-  extent: Extent,
-  facet: Facet$1,
-  field: Field$1,
-  filter: Filter,
-  flatten: Flatten,
-  fold: Fold,
-  formula: Formula,
-  generate: Generate,
-  impute: Impute,
-  joinaggregate: JoinAggregate,
-  kde: KDE,
-  key: Key$1,
-  load: Load$1,
-  lookup: Lookup,
-  multiextent: MultiExtent$1,
-  multivalues: MultiValues$1,
-  params: Params$2,
-  pivot: Pivot,
-  prefacet: PreFacet$1,
-  project: Project,
-  proxy: Proxy$1,
-  quantile: Quantile$1,
-  relay: Relay$1,
-  sample: Sample,
-  sequence: Sequence,
-  sieve: Sieve$1,
-  subflow: Subflow,
-  timeunit: TimeUnit,
-  tupleindex: TupleIndex,
-  values: Values$1,
-  window: Window
+    __proto__: null,
+    aggregate: Aggregate$1,
+    bin: Bin,
+    collect: Collect$1,
+    compare: Compare$1,
+    countpattern: CountPattern,
+    cross: Cross,
+    density: Density,
+    dotbin: DotBin,
+    expression: Expression$1,
+    extent: Extent,
+    facet: Facet$1,
+    field: Field$1,
+    filter: Filter,
+    flatten: Flatten,
+    fold: Fold,
+    formula: Formula,
+    generate: Generate,
+    impute: Impute,
+    joinaggregate: JoinAggregate,
+    kde: KDE,
+    key: Key$1,
+    load: Load$1,
+    lookup: Lookup,
+    multiextent: MultiExtent$1,
+    multivalues: MultiValues$1,
+    params: Params$2,
+    pivot: Pivot,
+    prefacet: PreFacet$1,
+    project: Project,
+    proxy: Proxy$1,
+    quantile: Quantile$1,
+    relay: Relay$1,
+    sample: Sample,
+    sequence: Sequence,
+    sieve: Sieve$1,
+    subflow: Subflow,
+    timeunit: TimeUnit,
+    tupleindex: TupleIndex,
+    values: Values$1,
+    window: Window
 });
 
 function constant$3 (x) {
@@ -13248,34 +13504,34 @@ function quantize$2 (interpolator, n) {
 }
 
 var $$1 = /*#__PURE__*/Object.freeze({
-  __proto__: null,
-  interpolate: interpolate$1,
-  interpolateArray: array$3,
-  interpolateBasis: basis$1,
-  interpolateBasisClosed: basisClosed,
-  interpolateCubehelix: cubehelix_default,
-  interpolateCubehelixLong: cubehelixLong,
-  interpolateDate: date$1,
-  interpolateDiscrete: discrete$1,
-  interpolateHcl: hcl_default,
-  interpolateHclLong: hclLong,
-  interpolateHsl: hsl_default,
-  interpolateHslLong: hslLong,
-  interpolateHue: hue,
-  interpolateLab: lab,
-  interpolateNumber: interpolateNumber,
-  interpolateNumberArray: numberArray,
-  interpolateObject: object,
-  interpolateRgb: rgb,
-  interpolateRgbBasis: rgbBasis,
-  interpolateRgbBasisClosed: rgbBasisClosed,
-  interpolateRound: interpolateRound,
-  interpolateString: string,
-  interpolateTransformCss: interpolateTransformCss,
-  interpolateTransformSvg: interpolateTransformSvg,
-  interpolateZoom: zoom,
-  piecewise: piecewise,
-  quantize: quantize$2
+    __proto__: null,
+    interpolate: interpolate$1,
+    interpolateArray: array$3,
+    interpolateBasis: basis$1,
+    interpolateBasisClosed: basisClosed,
+    interpolateCubehelix: cubehelix_default,
+    interpolateCubehelixLong: cubehelixLong,
+    interpolateDate: date$1,
+    interpolateDiscrete: discrete$1,
+    interpolateHcl: hcl_default,
+    interpolateHclLong: hclLong,
+    interpolateHsl: hsl_default,
+    interpolateHslLong: hslLong,
+    interpolateHue: hue,
+    interpolateLab: lab,
+    interpolateNumber: interpolateNumber,
+    interpolateNumberArray: numberArray,
+    interpolateObject: object,
+    interpolateRgb: rgb,
+    interpolateRgbBasis: rgbBasis,
+    interpolateRgbBasisClosed: rgbBasisClosed,
+    interpolateRound: interpolateRound,
+    interpolateString: string,
+    interpolateTransformCss: interpolateTransformCss,
+    interpolateTransformSvg: interpolateTransformSvg,
+    interpolateZoom: zoom,
+    piecewise: piecewise,
+    quantize: quantize$2
 });
 
 function constants(x) {
@@ -14550,7 +14806,14 @@ function tickCount(scale, count, minStep) {
       count = Math.max(count, scale.bins.length);
     }
     if (minStep != null) {
-      count = Math.min(count, Math.floor(span(scale.domain()) / minStep || 1) + 1);
+      const domain = scale.domain(),
+        lo = Math.min(domain[0], peek$1(domain)),
+        hi = Math.max(domain[0], peek$1(domain));
+      count = Math.min(count, Math.floor((hi - lo) / minStep || 1) + 1);
+      if (!scale.bins && !isLogarithmic(scale.type) && !isTemporal(scale.type) && lo < hi) {
+        // d3 tick steps grow monotonically as the count shrinks
+        while (count > 1 && tickStep(lo, hi, count) < minStep) --count;
+      }
     }
   }
   if (isObject(count)) {
@@ -14895,7 +15158,7 @@ const lookup$4 = {
   }
 };
 function curves(type, orientation, tension) {
-  var entry = has$1(lookup$4, type) && lookup$4[type],
+  var entry = hasOwnProperty(lookup$4, type) && lookup$4[type],
     curve = null;
   if (entry) {
     curve = entry.curve || entry[orientation || 'vertical'];
@@ -14917,7 +15180,7 @@ const paramCounts = {
   t: 2,
   a: 7
 };
-const commandPattern = /[mlhvzcsqta]([^mlhvzcsqta]+|$)/gi;
+const commandPattern = /[mlhvzcsqta]([^mlhvzcsqta]*)/gi;
 const numberPattern = /^[+-]?(([0-9]*\.[0-9]+)|([0-9]+\.)|([0-9]+))([eE][+-]?[0-9]+)?/;
 const spacePattern = /^((\s+,?\s*)|(,\s*))/;
 const flagPattern = /^[01]/;
@@ -15466,11 +15729,11 @@ const builtins = {
   }
 };
 function symbols(_) {
-  return has$1(builtins, _) ? builtins[_] : customSymbol(_);
+  return hasOwnProperty(builtins, _) ? builtins[_] : customSymbol(_);
 }
 var custom = {};
 function customSymbol(path) {
-  if (!has$1(custom, path)) {
+  if (!hasOwnProperty(custom, path)) {
     const parsed = parse$3(path);
     custom[path] = {
       draw: function (context, size) {
@@ -15780,13 +16043,13 @@ function clip$1$1(renderer, item, size) {
   }
   return 'url(#' + id + ')';
 }
-function Bounds(b) {
+function Bounds$1(b) {
   this.clear();
   if (b) this.union(b);
 }
-Bounds.prototype = {
+Bounds$1.prototype = {
   clone() {
-    return new Bounds(this);
+    return new Bounds$1(this);
   },
   clear() {
     this.x1 = +Number.MAX_VALUE;
@@ -15905,7 +16168,7 @@ Bounds.prototype = {
 };
 function Item(mark) {
   this.mark = mark;
-  this.bounds = this.bounds || new Bounds();
+  this.bounds = this.bounds || new Bounds$1();
 }
 function GroupItem(mark) {
   Item.call(this, mark);
@@ -15948,7 +16211,7 @@ class ResourceLoader {
 
       // set crossOrigin only if cors is defined; empty string sets anonymous mode
       // https://developer.mozilla.org/en-US/docs/Web/API/HTMLImageElement/crossOrigin
-      const cors = has$1(opt, 'crossOrigin') ? opt.crossOrigin : 'anonymous';
+      const cors = hasOwnProperty(opt, 'crossOrigin') ? opt.crossOrigin : 'anonymous';
       if (cors != null) img.crossOrigin = cors;
 
       // attempt to load image resource
@@ -15987,13 +16250,17 @@ function decrement(loader) {
 function boundStroke(bounds, item, miter) {
   if (item.stroke && item.opacity !== 0 && item.strokeOpacity !== 0) {
     const sw = item.strokeWidth != null ? +item.strokeWidth : 1;
-    bounds.expand(sw + (miter ? miterAdjustment(item, sw) : 0));
+    // stroke is centered on the path, extending half its width to either side;
+    // square caps on diagonal segments extend up to sqrt(2)/2 of the width
+    let e = (item.strokeCap === 'square' ? Math.SQRT2 : 1) * sw / 2;
+    if (miter && (!item.strokeJoin || item.strokeJoin === 'miter')) {
+      // miter join tips extend up to miterLimit/2 stroke widths past a vertex;
+      // the default limit of 4 matches both the canvas and svg renderers
+      e = Math.max(e, (item.strokeMiterLimit != null ? +item.strokeMiterLimit : 4) * sw / 2);
+    }
+    bounds.expand(e);
   }
   return bounds;
-}
-function miterAdjustment(item, strokeWidth) {
-  // TODO: more sophisticated adjustment? Or miter support in boundContext?
-  return item.strokeJoin && item.strokeJoin !== 'miter' ? 0 : strokeWidth;
 }
 const circleThreshold = Tau - 1e-8;
 let bounds, lx, ly, rot, ma, mb, mc, md;
@@ -16134,7 +16401,7 @@ function cubic(t, x0, x1, x2, x3) {
   return s2 * s * x0 + 3 * s2 * t * x1 + 3 * s * t2 * x2 + t2 * t * x3;
 }
 var context$2 = (context$2 = canvas(1, 1)) ? context$2.getContext('2d') : null;
-const b = new Bounds();
+const b = new Bounds$1();
 function intersectPath(draw) {
   return function (item, brush) {
     // rely on (inaccurate) bounds intersection if no context
@@ -16290,7 +16557,7 @@ function stroke(context, item, opacity) {
     context.lineWidth = lw;
     context.lineCap = item.strokeCap || 'butt';
     context.lineJoin = item.strokeJoin || 'miter';
-    context.miterLimit = item.strokeMiterLimit || 10;
+    context.miterLimit = item.strokeMiterLimit != null ? item.strokeMiterLimit : 4;
     if (context.setLineDash) {
       context.setLineDash(item.strokeDash || Empty);
       context.lineDashOffset = item.strokeDashOffset || 0;
@@ -16439,7 +16706,7 @@ function markItemPath(type, shape, isect) {
   }
   function bound(bounds, item) {
     shape(boundContext(bounds, item.angle), item);
-    return boundStroke(bounds, item).translate(item.x || 0, item.y || 0);
+    return boundStroke(bounds, item, true).translate(item.x || 0, item.y || 0);
   }
   function draw(context, item) {
     var x = item.x || 0,
@@ -16522,7 +16789,7 @@ function markMultiItemPath(type, shape, tip) {
       return bounds;
     } else {
       shape(boundContext(bounds), items);
-      return boundStroke(bounds, items[0]);
+      return boundStroke(bounds, items[0], true);
     }
   }
   function draw(context, items) {
@@ -17071,7 +17338,7 @@ const textAlign = {
   'center': 'middle',
   'right': 'end'
 };
-const tempBounds$1 = new Bounds();
+const tempBounds$1 = new Bounds$1();
 function anchorPoint(item) {
   var x = item.x || 0,
     y = item.y || 0,
@@ -17239,7 +17506,7 @@ function boundItem$1(item, func, opt) {
   var type = Marks[item.mark.marktype],
     bound = func || type.bound;
   if (type.nested) item = item.mark;
-  return bound(item.bounds || (item.bounds = new Bounds()), item, opt);
+  return bound(item.bounds || (item.bounds = new Bounds$1()), item, opt);
 }
 var DUMMY = {
   mark: null
@@ -17265,7 +17532,7 @@ function boundMark(mark, bounds, opt) {
     bounds = bounds && bounds.union(b) || b;
     return bounds;
   }
-  bounds = bounds || mark.bounds && mark.bounds.clear() || new Bounds();
+  bounds = bounds || mark.bounds && mark.bounds.clear() || new Bounds$1();
   if (hasItems) {
     for (i = 0, n = items.length; i < n; ++i) {
       bounds.union(boundItem$1(items[i], bound, opt));
@@ -17355,7 +17622,7 @@ class Scenegraph {
 }
 function createMark(def, group) {
   const mark = {
-    bounds: new Bounds(),
+    bounds: new Bounds$1(),
     clip: !!def.clip,
     group: group,
     interactive: def.interactive === false ? false : true,
@@ -17421,8 +17688,31 @@ function cssClass(mark) {
   return 'mark-' + mark.marktype + (mark.role ? ' role-' + mark.role : '') + (mark.name ? ' ' + mark.name : '');
 }
 function point(event, el) {
-  const rect = el.getBoundingClientRect();
-  return [event.clientX - rect.left - (el.clientLeft || 0), event.clientY - rect.top - (el.clientTop || 0)];
+  if (el.getScreenCTM) {
+    const p = ctmPoint(event, el.getScreenCTM());
+    if (p) return p;
+  }
+  return rectPoint(event, el, el.getBoundingClientRect());
+}
+
+// map a client point to element coordinates by inverting the screen CTM,
+// compensating for any CSS transforms on ancestor elements
+function ctmPoint(event, ctm) {
+  if (!ctm) return null;
+  const det = ctm.a * ctm.d - ctm.b * ctm.c;
+  if (!det) return null;
+  const x = event.clientX - ctm.e,
+    y = event.clientY - ctm.f;
+  return [(ctm.d * x - ctm.c * y) / det, (ctm.a * y - ctm.b * x) / det];
+}
+
+// map a client point to element coordinates using bounding rect geometry,
+// unscaling (bounding rect size over untransformed layout size) to
+// compensate for CSS transforms before subtracting layout-unit borders
+function rectPoint(event, el, rect) {
+  const sx = el.offsetWidth ? rect.width / el.offsetWidth : 1,
+    sy = el.offsetHeight ? rect.height / el.offsetHeight : 1;
+  return [(event.clientX - rect.left) / sx - (el.clientLeft || 0), (event.clientY - rect.top) / sy - (el.clientTop || 0)];
 }
 function resolveItem(item, event, el, origin) {
   var mark = item && item.mark,
@@ -18065,8 +18355,8 @@ class CanvasRenderer extends Renderer {
     super(loader);
     this._options = {};
     this._redraw = false;
-    this._dirty = new Bounds();
-    this._tempb = new Bounds();
+    this._dirty = new Bounds$1();
+    this._tempb = new Bounds$1();
   }
   initialize(el, width, height, origin, scaleFactor, options) {
     this._options = options || {};
@@ -18164,7 +18454,7 @@ class CanvasRenderer extends Renderer {
     }
   }
 }
-const viewBounds = (origin, width, height) => new Bounds().set(0, 0, width, height).translate(-origin[0], -origin[1]);
+const viewBounds = (origin, width, height) => new Bounds$1().set(0, 0, width, height).translate(-origin[0], -origin[1]);
 function clipToBounds(g, b, origin) {
   // expand bounds by 1 pixel, then round to pixel boundaries
   b.expand(1).round();
@@ -18324,7 +18614,7 @@ function ariaGuide(mark, opt) {
   try {
     const item = mark.items[0],
       caption = opt.caption || (() => '');
-    return bundle(opt.role || GRAPHICS_SYMBOL, opt.desc, item.description || caption(item));
+    return bundle(opt.role || GRAPHICS_SYMBOL, opt.desc, mark.description || item.description || caption(item));
   } catch (err) {
     return null;
   }
@@ -18448,10 +18738,11 @@ const stylesCss = {
   blend: 'mix-blend-mode'
 };
 
-// ensure miter limit default is consistent with canvas (#2498)
+// ensure miter limit default is consistent with canvas (#2498);
+// both renderers use the SVG default limit of 4
 const rootAttributes = {
   'fill': 'none',
-  'stroke-miterlimit': 10
+  'stroke-miterlimit': 4
 };
 const RootIndex = 0,
   xmlns = 'http://www.w3.org/2000/xmlns/',
@@ -19582,7 +19873,7 @@ function renderModule(name, _) {
 function intersect$2(scene, bounds, filter) {
   const hits = [],
     // intersection results
-    box = new Bounds().union(bounds),
+    box = new Bounds$1().union(bounds),
     // defensive copy
     type = scene.marktype;
   return type ? intersectMark(scene, box, filter, hits) : type === 'group' ? intersectGroup(scene, box, filter, hits) : error('Intersect scene must be mark node or group item.');
@@ -19639,7 +19930,7 @@ function intersectItem(item, box, test) {
   const bounds = item.bounds;
   return box.encloses(bounds) || box.intersects(bounds) && test(item, box);
 }
-const clipBounds = new Bounds();
+const clipBounds = new Bounds$1();
 function boundClip(mark) {
   const clip = mark.clip;
   if (isFunction(clip)) {
@@ -19692,6 +19983,7 @@ const End$1 = 'end';
 const X = 'x';
 const Y = 'y';
 const Group = 'group';
+const Bounds = 'bounds';
 const AxisRole$1 = 'axis';
 const TitleRole$1 = 'title';
 const FrameRole$1 = 'frame';
@@ -19918,7 +20210,7 @@ const hasBounds = item => {
 };
 const boundTest = (scale, orient, tolerance) => {
   var range = scale.range(),
-    b = new Bounds();
+    b = new Bounds$1();
   if (orient === Top$1 || orient === Bottom$1) {
     b.set(range[0], -Infinity, range[1], +Infinity);
   } else {
@@ -20008,7 +20300,7 @@ inherits(Render$1, Transform, {
     }
   }
 });
-const tempBounds = new Bounds();
+const tempBounds = new Bounds$1();
 function set$2(item, property, value) {
   return item[property] === value ? 0 : (item[property] = value, 1);
 }
@@ -20163,7 +20455,7 @@ function gridLayoutGroups(group) {
   return views;
 }
 function bboxFlush(item) {
-  return new Bounds().set(0, 0, item.width || 0, item.height || 0);
+  return new Bounds$1().set(0, 0, item.width || 0, item.height || 0);
 }
 function bboxFull(item) {
   const b = item.bounds.clone();
@@ -20528,7 +20820,10 @@ function legendParams(g, orient, config, xb, yb, w, h) {
   const _ = lookup$3(config, orient),
     offset = offsets(g, _('offset', 0)),
     anchor = _('anchor', Start$1),
-    mult = anchor === End$1 ? 1 : anchor === Middle$1 ? 0.5 : 0;
+    frame = _('frame', Group),
+    mult = anchor === End$1 ? 1 : anchor === Middle$1 ? 0.5 : 0,
+    ax = frame === Bounds ? xb.x1 + mult * xb.width() : mult * (w || yb.width() + 2 * yb.x1),
+    ay = frame === Bounds ? yb.y1 + mult * yb.height() : mult * (h || xb.height() + 2 * xb.y1);
   const p = {
     align: Each,
     bounds: _('bounds', Flush),
@@ -20542,14 +20837,14 @@ function legendParams(g, orient, config, xb, yb, w, h) {
       p.anchor = {
         x: Math.floor(xb.x1) - offset,
         column: End$1,
-        y: mult * (h || xb.height() + 2 * xb.y1),
+        y: ay,
         row: anchor
       };
       break;
     case Right$1:
       p.anchor = {
         x: Math.ceil(xb.x2) + offset,
-        y: mult * (h || xb.height() + 2 * xb.y1),
+        y: ay,
         row: anchor
       };
       break;
@@ -20557,14 +20852,14 @@ function legendParams(g, orient, config, xb, yb, w, h) {
       p.anchor = {
         y: Math.floor(yb.y1) - offset,
         row: End$1,
-        x: mult * (w || yb.width() + 2 * yb.x1),
+        x: ax,
         column: anchor
       };
       break;
     case Bottom$1:
       p.anchor = {
         y: Math.ceil(yb.y2) + offset,
-        x: mult * (w || yb.width() + 2 * yb.x1),
+        x: ax,
         column: anchor
       };
       break;
@@ -20640,6 +20935,13 @@ function legendLayout(view, legend) {
 function legendBounds(item, b) {
   // aggregate item bounds
   item.items.forEach(_ => b.union(_.bounds));
+  if (b.empty()) {
+    // set upper-right corner for empty legends (e.g., no entries or title);
+    // otherwise the -MAX_VALUE sentinel extents would survive the x1/y1
+    // anchoring below, inflating legend size and autosize layout (#2881)
+    b.x2 = item.padding;
+    b.y2 = item.padding;
+  }
 
   // anchor to legend origin
   b.x1 = item.padding;
@@ -20837,7 +21139,7 @@ function layoutGroup(view, group, _) {
   var items = group.items,
     width = Math.max(0, group.width || 0),
     height = Math.max(0, group.height || 0),
-    viewBounds = new Bounds().set(0, 0, width, height),
+    viewBounds = new Bounds$1().set(0, 0, width, height),
     xBounds = viewBounds.clone(),
     yBounds = viewBounds.clone(),
     legends = [],
@@ -20976,13 +21278,13 @@ function viewSizeLayout(view, group, viewBounds, _) {
 }
 
 var vtx = /*#__PURE__*/Object.freeze({
-  __proto__: null,
-  bound: Bound$1,
-  identifier: Identifier$1,
-  mark: Mark$1,
-  overlap: Overlap$1,
-  render: Render$1,
-  viewlayout: ViewLayout$1
+    __proto__: null,
+    bound: Bound$1,
+    identifier: Identifier$1,
+    mark: Mark$1,
+    overlap: Overlap$1,
+    render: Render$1,
+    viewlayout: ViewLayout$1
 });
 
 /**
@@ -21020,6 +21322,7 @@ inherits(AxisTicks$1, Transform, {
     if (ticks) out.rem = ticks;
     ticks = values.map((value, i) => ingest$1({
       index: i / (values.length - 1 || 1),
+      tickIndex: i,
       value: value,
       label: format(value)
     }));
@@ -21028,6 +21331,7 @@ inherits(AxisTicks$1, Transform, {
       // this is used to generate axes with 'binned' domains
       ticks.push(ingest$1({
         index: -1,
+        tickIndex: -1,
         extra: {
           value: ticks[0].value
         },
@@ -21637,7 +21941,7 @@ function domainCheck(type, domain, df) {
     // if all pos or all neg, abs(sum) === domain.length
     var s = Math.abs(domain.reduce((s, v) => s + (v < 0 ? -1 : v > 0 ? 1 : 0), 0));
     if (s !== domain.length) {
-      df.warn('Log scale domain includes zero: ' + $(domain));
+      df.warn('Log scale domain includes zero: ' + stringValue(domain));
     }
   }
   return domain;
@@ -21900,7 +22204,7 @@ function partition$3(data, groupby, sort, field) {
   } else {
     for (map = {}, i = 0, n = data.length; i < n; ++i) {
       t = data[i];
-      k = groupby.map(get);
+      k = JSON.stringify(groupby.map(get));
       g = map[k];
       if (!g) {
         map[k] = g = [];
@@ -21925,16 +22229,16 @@ function partition$3(data, groupby, sort, field) {
 }
 
 var encode$1 = /*#__PURE__*/Object.freeze({
-  __proto__: null,
-  axisticks: AxisTicks$1,
-  datajoin: DataJoin$1,
-  encode: Encode$1,
-  legendentries: LegendEntries$1,
-  linkpath: LinkPath,
-  pie: Pie,
-  scale: Scale$1,
-  sortitems: SortItems$1,
-  stack: Stack
+    __proto__: null,
+    axisticks: AxisTicks$1,
+    datajoin: DataJoin$1,
+    encode: Encode$1,
+    legendentries: LegendEntries$1,
+    linkpath: LinkPath,
+    pie: Pie,
+    scale: Scale$1,
+    sortitems: SortItems$1,
+    stack: Stack
 });
 
 var epsilon$3 = 1e-6;
@@ -24972,7 +25276,7 @@ inherits(Isocontour, Transform, {
     }
     var out = pulse.fork(pulse.NO_SOURCE | pulse.NO_FIELDS),
       source = pulse.materialize(pulse.SOURCE).source,
-      field = _.field || identity$6,
+      field = _.field || identity$7,
       contour = contours().smooth(_.smooth !== false),
       tz = _.thresholds || levels(source, field, _),
       as = _.as === null ? null : _.as || 'contour',
@@ -25448,7 +25752,7 @@ inherits(GeoJSON, Transform, {
       fields = _.fields,
       lon = fields && fields[0],
       lat = fields && fields[1],
-      geojson = _.geojson || !fields && identity$6,
+      geojson = _.geojson || !fields && identity$7,
       flag = pulse.ADD,
       mod;
     mod = _.modified() || pulse.changed(pulse.REM) || pulse.modified(accessorFields(geojson)) || lon && pulse.modified(accessorFields(lon)) || lat && pulse.modified(accessorFields(lat));
@@ -25522,7 +25826,7 @@ inherits(GeoPath, Transform, {
   transform(_, pulse) {
     var out = pulse.fork(pulse.ALL),
       path = this.value,
-      field = _.field || identity$6,
+      field = _.field || identity$7,
       as = _.as || 'path',
       flag = out.SOURCE;
     if (!path || _.modified()) {
@@ -25530,7 +25834,7 @@ inherits(GeoPath, Transform, {
       this.value = path = getProjectionPath(_.projection);
       out.materialize().reflow();
     } else {
-      flag = field === identity$6 || pulse.modified(field.fields) ? out.ADD_MOD : out.ADD;
+      flag = field === identity$7 || pulse.modified(field.fields) ? out.ADD_MOD : out.ADD;
     }
     const prev = initPath(path, _.pointRadius);
     out.visit(flag, t => t[as] = path(field(t)));
@@ -25827,7 +26131,7 @@ inherits(Heatmap, Transform, {
     }
     var source = pulse.materialize(pulse.SOURCE).source,
       shared = _.resolve === 'shared',
-      field = _.field || identity$6,
+      field = _.field || identity$7,
       opacity = opacity_(_.opacity, _),
       color = color_(_.color, _),
       as = _.as || 'image',
@@ -25973,17 +26277,17 @@ function featurize(f) {
 }
 
 var geo = /*#__PURE__*/Object.freeze({
-  __proto__: null,
-  contour: Contour,
-  geojson: GeoJSON,
-  geopath: GeoPath,
-  geopoint: GeoPoint,
-  geoshape: GeoShape,
-  graticule: Graticule,
-  heatmap: Heatmap,
-  isocontour: Isocontour,
-  kde2d: KDE2D,
-  projection: Projection$1
+    __proto__: null,
+    contour: Contour,
+    geojson: GeoJSON,
+    geopath: GeoPath,
+    geopoint: GeoPoint,
+    geoshape: GeoShape,
+    graticule: Graticule,
+    heatmap: Heatmap,
+    isocontour: Isocontour,
+    kde2d: KDE2D,
+    projection: Projection$1
 });
 
 function forceCenter (x, y) {
@@ -27407,7 +27711,7 @@ function modified(f, pulse) {
 }
 function getForce(_) {
   var f, p;
-  if (!has$1(ForceMap, _.force)) {
+  if (!hasOwnProperty(ForceMap, _.force)) {
     error('Unrecognized force: ' + _.force);
   }
   f = ForceMap[_.force]();
@@ -27421,8 +27725,8 @@ function setForceParam(f, v, _) {
 }
 
 var force = /*#__PURE__*/Object.freeze({
-  __proto__: null,
-  force: Force
+    __proto__: null,
+    force: Force
 });
 
 function defaultSeparation$2(a, b) {
@@ -29104,7 +29408,7 @@ inherits(Tree, HierarchyLayout, {
    */
   layout(method) {
     const m = method || 'tidy';
-    if (has$1(Layouts, m)) return Layouts[m]();else error('Unrecognized Tree layout method: ' + m);
+    if (hasOwnProperty(Layouts, m)) return Layouts[m]();else error('Unrecognized Tree layout method: ' + m);
   },
   params: ['size', 'nodeSize'],
   fields: Output$1$1
@@ -29266,7 +29570,7 @@ inherits(Treemap, HierarchyLayout, {
       if (t.ratio) x.tile(t.ratio(_));
     };
     x.method = _ => {
-      if (has$1(Tiles, _)) x.tile(Tiles[_]);else error('Unrecognized Treemap layout method: ' + _);
+      if (hasOwnProperty(Tiles, _)) x.tile(Tiles[_]);else error('Unrecognized Treemap layout method: ' + _);
     };
     return x;
   },
@@ -29275,14 +29579,14 @@ inherits(Treemap, HierarchyLayout, {
 });
 
 var tree = /*#__PURE__*/Object.freeze({
-  __proto__: null,
-  nest: Nest,
-  pack: Pack,
-  partition: Partition,
-  stratify: Stratify,
-  tree: Tree,
-  treelinks: TreeLinks,
-  treemap: Treemap
+    __proto__: null,
+    nest: Nest,
+    pack: Pack,
+    partition: Partition,
+    stratify: Stratify,
+    tree: Tree,
+    treelinks: TreeLinks,
+    treemap: Treemap
 });
 
 // bit mask for getting first 2 bytes of alpha value
@@ -30147,8 +30451,8 @@ inherits(Label$1, Transform, {
 });
 
 var label = /*#__PURE__*/Object.freeze({
-  __proto__: null,
-  label: Label$1
+    __proto__: null,
+    label: Label$1
 });
 
 function partition(data, groupby) {
@@ -30328,7 +30632,7 @@ inherits(Regression, Transform, {
         fit = Methods[method],
         values = [];
       let domain = _.extent;
-      if (!has$1(Methods, method)) {
+      if (!hasOwnProperty(Methods, method)) {
         error('Invalid regression method: ' + method);
       }
       if (domain != null) {
@@ -30379,9 +30683,9 @@ inherits(Regression, Transform, {
 });
 
 var reg = /*#__PURE__*/Object.freeze({
-  __proto__: null,
-  loess: Loess,
-  regression: Regression
+    __proto__: null,
+    loess: Loess,
+    regression: Regression
 });
 
 const epsilon$1 = 1.1102230246251565e-16;
@@ -31847,8 +32151,8 @@ function isPoint(p) {
 }
 
 var voronoi = /*#__PURE__*/Object.freeze({
-  __proto__: null,
-  voronoi: Voronoi
+    __proto__: null,
+    voronoi: Voronoi
 });
 
 /*
@@ -32382,8 +32686,8 @@ inherits(Wordcloud, Transform, {
 });
 
 var wordcloud = /*#__PURE__*/Object.freeze({
-  __proto__: null,
-  wordcloud: Wordcloud
+    __proto__: null,
+    wordcloud: Wordcloud
 });
 
 const array8 = n => new Uint8Array(n);
@@ -32566,7 +32870,7 @@ function SortedIndex() {
       array = value;
       n = size;
     }
-    return [bisectLeft$1(array, range[0], 0, n), bisectRight$1(array, range[1], 0, n)];
+    return [bisectLeft$1(array, range[0], 0, n), bisectLeft$1(array, range[1], 0, n)];
   }
   return {
     insert: insert,
@@ -33053,12 +33357,12 @@ inherits(ResolveFilter, Transform, {
 });
 
 var xf = /*#__PURE__*/Object.freeze({
-  __proto__: null,
-  crossfilter: CrossFilter,
-  resolvefilter: ResolveFilter
+    __proto__: null,
+    crossfilter: CrossFilter,
+    resolvefilter: ResolveFilter
 });
 
-var version$1 = "6.2.0";
+var version$1 = "6.3.1";
 
 const RawCode = 'RawCode';
 const Literal = 'Literal';
@@ -34539,6 +34843,8 @@ function Functions(codegen) {
     // base64 encode/decode
     btoa: 'btoa',
     atob: 'atob',
+    // URI encoding
+    encodeURIComponent: 'encodeURIComponent',
     // REGEXP functions
     regexp: REGEXP,
     test: fn('test', REGEXP),
@@ -34564,8 +34870,6 @@ function codegen(opt) {
     globalvar = opt.globalvar,
     fieldvar = opt.fieldvar,
     outputGlobal = isFunction(globalvar) ? globalvar : id => `${globalvar}["${id}"]`;
-  // JSON authors are not allowed to set properties with these names, as these are built-in to the JS Object Prototype.
-  new Set([...Object.getOwnPropertyNames(Object.prototype).filter(name => typeof Object.prototype[name] === 'function'), '__proto__']);
   let globals = {},
     fields = {},
     memberDepth = 0;
@@ -34581,11 +34885,11 @@ function codegen(opt) {
       const id = n.name;
       if (memberDepth > 0) {
         return id;
-      } else if (has$1(forbidden, id)) {
+      } else if (hasOwnProperty(forbidden, id)) {
         return error('Illegal identifier: ' + id);
-      } else if (has$1(constants, id)) {
+      } else if (hasOwnProperty(constants, id)) {
         return constants[id];
-      } else if (has$1(allowed, id)) {
+      } else if (hasOwnProperty(allowed, id)) {
         return id;
       } else {
         globals[id] = 1;
@@ -34610,7 +34914,7 @@ function codegen(opt) {
       }
       const callee = n.callee.name,
         args = n.arguments,
-        fn = has$1(functions, callee) && functions[callee];
+        fn = hasOwnProperty(functions, callee) && functions[callee];
       if (!fn) error('Unrecognized function: ' + callee);
       return isFunction(fn) ? fn(args) : fn + '(' + args.map(visit).join(',') + ')';
     },
@@ -34807,12 +35111,18 @@ function selectionIdTest(name, datum, op) {
 
 /**
  * Maps an array of scene graph items to an array of selection tuples.
- * @param {string} name  - The name of the dataset representing the selection.
- * @param {string} base  - The base object that generated tuples extend.
+ * @param {array} array - Input scene graph items
+ * @param {object} base - The base object that generated tuples extend.
  *
  * @returns {array} An array of selection entries for the given unit.
  */
 function selectionTuples(array, base) {
+  if (!isArray(array)) {
+    error('First argument to selectionTuples must be an array.');
+  }
+  if (!isObject(base)) {
+    error('Second argument to selectionTuples must be an object.');
+  }
   return array.map(x => extend$1(base.fields ? {
     values: base.fields.map(f => getter(f)(x.datum))
   } : {
@@ -34970,10 +35280,10 @@ function selectionVisitor(name, args, scope, params) {
     field = 'unit',
     indexName = IndexPrefix$1 + field,
     dataName = DataPrefix$1 + data;
-  if (op === Intersect && !has$1(params, indexName)) {
+  if (op === Intersect && !hasOwnProperty(params, indexName)) {
     params[indexName] = scope.getData(data).indataRef(scope, field);
   }
-  if (!has$1(params, dataName)) {
+  if (!hasOwnProperty(params, dataName)) {
     params[dataName] = scope.getData(data).tuplesRef();
   }
 }
@@ -35041,7 +35351,7 @@ function dataVisitor(name, args, scope, params) {
   }
   const data = args[0].value,
     dataName = DataPrefix + data;
-  if (!has$1(dataName, params)) {
+  if (!hasOwnProperty(dataName, params)) {
     try {
       params[dataName] = scope.getData(data).tuplesRef();
     } catch (err) {
@@ -35055,7 +35365,7 @@ function indataVisitor(name, args, scope, params) {
   const data = args[0].value,
     field = args[1].value,
     indexName = IndexPrefix + field;
-  if (!has$1(indexName, params)) {
+  if (!hasOwnProperty(indexName, params)) {
     params[indexName] = scope.getData(data).indataRef(scope, field);
   }
 }
@@ -35072,7 +35382,7 @@ function scaleVisitor(name, args, scope, params) {
 }
 function addScaleDependency(scope, params, name) {
   const scaleName = ScalePrefix + name;
-  if (!has$1(params, scaleName)) {
+  if (!hasOwnProperty(params, scaleName)) {
     try {
       params[scaleName] = scope.scaleRef(name);
     } catch (err) {
@@ -35104,7 +35414,7 @@ function internalScaleFunctions(codegen, fnctx, visitors) {
   visitors._scale = scaleVisitor;
 
   // resolve scale reference directly to the signal hash argument
-  const ref = arg => '_[' + (arg.type === Literal ? $(ScalePrefix + arg.value) : $(ScalePrefix) + '+' + codegen(arg)) + ']';
+  const ref = arg => '_[' + (arg.type === Literal ? stringValue(ScalePrefix + arg.value) : stringValue(ScalePrefix) + '+' + codegen(arg)) + ']';
 
   // define and return internal scale function code generators
   // these internal functions are called by mark encoders
@@ -35210,6 +35520,16 @@ function equalObject(a, b) {
 function removePredicate(props) {
   return _ => equalObject(props, _);
 }
+
+/**
+ * Modify data in a dataset.
+ * @param {string} name - Dataset name
+ * @param {Array|Object} insert - Data to insert
+ * @param {boolean|Array|Object} remove - true to remove all, array/tuple to remove, or object to match
+ * @param {Object} toggle - Data to toggle
+ * @param {Object|Array} modify - Tuple or array of tuples to modify
+ * @param {Object} values - Field values to update
+ */
 function modify(name, insert, remove, toggle, modify, values) {
   const df = this.context.dataflow,
     data = this.context.data[name],
@@ -35246,6 +35566,9 @@ function modify(name, insert, remove, toggle, modify, values) {
     }
   }
   if (modify) {
+    if (isFunction(modify)) {
+      throw Error('modify parameter must be a data tuple, not a function');
+    }
     for (key in values) {
       changes.modify(modify, key, values[key]);
     }
@@ -35331,7 +35654,7 @@ function scaleGradient(scale, p0, p1, count, group) {
   let stops = scale.domain(),
     min = stops[0],
     max = peek$1(stops),
-    fraction = identity$6;
+    fraction = identity$7;
   if (!(max - min)) {
     // expand scale if domain has zero span, fix #1479
     scale = (scale.interpolator ? scale$4('sequential')().interpolator(scale.interpolator()) : scale$4('linear')().interpolate(scale.interpolate()).range(scale.range())).domain([min = 0, max = 1]);
@@ -35390,7 +35713,7 @@ function containerSize() {
 function intersect(b, opt, group) {
   if (!b) return [];
   const [u, v] = b,
-    box = new Bounds().set(u[0], u[1], v[0], v[1]),
+    box = new Bounds$1().set(u[0], u[1], v[0], v[1]),
     scene = group || this.context.dataflow.scenegraph().root;
   return intersect$2(scene, box, filter(opt));
 }
@@ -35422,7 +35745,7 @@ function lassoAppend(lasso, x, y, minDist = 5) {
 }
 
 /**
- * Generates a svg path command which draws a lasso
+ * Generates an svg path command which draws a lasso
  *
  * @param {*} lasso the lasso in pixel space in the form [[x,y], [x,y], ...]
  * @returns the svg path command that draws the lasso
@@ -35448,7 +35771,7 @@ function intersectLasso(markname, pixelLasso, unit) {
     y,
     mark
   } = unit;
-  const bb = new Bounds().set(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER);
+  const bb = new Bounds$1().set(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER);
 
   // Get bounding box around lasso
   for (const [px, py] of pixelLasso) {
@@ -35619,7 +35942,7 @@ const codegenParams = {
   forbidden: ['_'],
   allowed: ['datum', 'event', 'item'],
   fieldvar: 'datum',
-  globalvar: id => `_[${$(SignalPrefix + id)}]`,
+  globalvar: id => `_[${stringValue(SignalPrefix + id)}]`,
   functions: buildFunctions,
   constants: Constants,
   visitors: astVisitors
@@ -35686,7 +36009,7 @@ function parser(expr, scope) {
   // parse the expression to an abstract syntax tree (ast)
   let ast;
   try {
-    expr = isString(expr) ? expr : $(expr) + '';
+    expr = isString(expr) ? expr : stringValue(expr) + '';
     ast = parser$1(expr);
   } catch (err) {
     error('Expression parse error: ' + expr);
@@ -35706,7 +36029,7 @@ function parser(expr, scope) {
   // collect signal dependencies
   gen.globals.forEach(name => {
     const signalName = SignalPrefix + name;
-    if (!has$1(params, signalName) && scope.getSignal(name)) {
+    if (!hasOwnProperty(params, signalName) && scope.getSignal(name)) {
       params[signalName] = scope.signalRef(name);
     }
   });
@@ -35846,7 +36169,7 @@ var expressionCodegen = {
     } = encode;
     let code = 'var o=item,datum=o.datum,m=0,$;';
     for (const name in channels) {
-      const o = 'o[' + $(name) + ']';
+      const o = 'o[' + stringValue(name) + ']';
       code += `$=${channels[name].code};if(${o}!==$)${o}=$,m=1;`;
     }
     code += adjustSpatial(channels, marktype);
@@ -35858,7 +36181,7 @@ var expressionCodegen = {
    */
   codegen: {
     get(path) {
-      const ref = `[${path.map($).join('][')}]`;
+      const ref = `[${path.map(stringValue).join('][')}]`;
       const get = Function('_', `return _${ref};`);
       get.path = ref;
       return get;
@@ -35928,7 +36251,7 @@ function parseParameter$2(spec, ctx, params) {
   if (!spec || !isObject(spec)) return spec;
   for (let i = 0, n = PARSERS.length, p; i < n; ++i) {
     p = PARSERS[i];
-    if (has$1(spec, p.key)) {
+    if (hasOwnProperty(spec, p.key)) {
       return p.parse(spec, ctx, params);
     }
   }
@@ -36367,7 +36690,7 @@ function setCursor(view, cursor) {
 }
 function dataref(view, name) {
   var data = view._runtime.data;
-  if (!has$1(data, name)) {
+  if (!hasOwnProperty(data, name)) {
     error('Unrecognized data set: ' + name);
   }
   return data[name];
@@ -37089,7 +37412,7 @@ function runtime(view, spec, expr) {
 }
 function scale$1(name) {
   var scales = this._runtime.scales;
-  if (!has$1(scales, name)) {
+  if (!hasOwnProperty(scales, name)) {
     error('Unrecognized scale or projection: ' + name);
   }
   return scales[name].value;
@@ -37380,7 +37703,7 @@ function View$1(spec, options) {
   if (options.watchPixelRatio) view._watchPixelRatio();
 }
 function lookupSignal(view, name) {
-  return has$1(view._signals, name) ? view._signals[name] : error('Unrecognized signal name: ' + $(name));
+  return hasOwnProperty(view._signals, name) ? view._signals[name] : error('Unrecognized signal name: ' + stringValue(name));
 }
 function findOperatorHandler(op, handler) {
   const h = (op._targets || []).filter(op => op._update && op._update.handler === handler);
@@ -37859,7 +38182,7 @@ function addEncoders(object, enter, update) {
 }
 function extendEncode(encode, extra, skip) {
   for (const name in extra) {
-    if (skip && has$1(skip, name)) continue;
+    if (skip && hasOwnProperty(skip, name)) continue;
     encode[name] = extend$1(encode[name] || {}, extra[name]);
   }
   return encode;
@@ -37939,12 +38262,12 @@ function applyDefault(defaults, key, value) {
     value: value
   };
 }
-const scaleRef = scale => isString(scale) ? $(scale) : scale.signal ? `(${scale.signal})` : field(scale);
+const scaleRef = scale => isString(scale) ? stringValue(scale) : scale.signal ? `(${scale.signal})` : field(scale);
 function entry$1(enc) {
   if (enc.gradient != null) {
     return gradient(enc);
   }
-  let value = enc.signal ? `(${enc.signal})` : enc.color ? color(enc.color) : enc.field != null ? field(enc.field) : enc.value !== undefined ? $(enc.value) : undefined;
+  let value = enc.signal ? `(${enc.signal})` : enc.color ? color(enc.color) : enc.field != null ? field(enc.field) : enc.value !== undefined ? stringValue(enc.value) : undefined;
   if (enc.scale != null) {
     value = scale(enc, value);
   }
@@ -37971,7 +38294,7 @@ function color(enc) {
 }
 function gradient(enc) {
   // map undefined to null; expression lang does not allow undefined
-  const args = [enc.start, enc.stop, enc.count].map(_ => _ == null ? null : $(_));
+  const args = [enc.start, enc.stop, enc.count].map(_ => _ == null ? null : stringValue(_));
 
   // trim null inputs from the end
   while (args.length && peek$1(args) == null) args.pop();
@@ -38007,10 +38330,10 @@ function resolveField(ref) {
     object = 'datum';
     field = ref.datum;
   } else {
-    error('Invalid field reference: ' + $(ref));
+    error('Invalid field reference: ' + stringValue(ref));
   }
   if (!ref.signal) {
-    field = isString(field) ? splitAccessPath(field).map($).join('][') : resolveField(field);
+    field = isString(field) ? splitAccessPath(field).map(stringValue).join('][') : resolveField(field);
   }
   return object + '[' + field + ']';
 }
@@ -38088,7 +38411,7 @@ function parse$1(code, scope, params, fields) {
 const OUTER = 'outer',
   OUTER_INVALID = ['value', 'update', 'init', 'react', 'bind'];
 function outerError(prefix, name) {
-  error(prefix + ' for "outer" push: ' + $(name));
+  error(prefix + ' for "outer" push: ' + stringValue(name));
 }
 function parseSignal(signal, scope) {
   const name = signal.name;
@@ -38161,7 +38484,13 @@ function sortKey(sort) {
   return !isObject(sort) ? '' : (sort.order === Descending ? '-' : '+') + aggrField(sort.op, sort.field);
 }
 function aggrField(op, field) {
-  return (op && op.signal ? '$' + op.signal : op || '') + (op && field ? '_' : '') + (field && field.signal ? '$' + field.signal : field || '');
+  return (op && op.signal ? '$' + op.signal : op || '') + (op && field ? '_' : '') + (field && field.signal ? '$' + field.signal
+  // Replace non-alphanumeric character sequences with underscores and trim leading/trailing underscores
+  // to prevent incorrect path extraction for nested target fields or target fields with (escaped) dots. 
+  // Example: 'a\\.b[c.d]' => 'a_b_c_d'. 
+  // Note: aggregating both a nested field and a field with a dot could lead to conflicting names: 
+  // with data like [{ a: {b: 1}, 'a.b': 1 }], summing 'a.b' and 'a\\.b' would both result in a field 'sum_a_b'   
+  : field?.replace(/\W+/g, '_').replace(/^_+|_+$/g, '') || '');
 }
 
 // -----
@@ -38189,7 +38518,7 @@ function deref(v) {
 }
 const Timer = 'timer';
 function parseStream(stream, scope) {
-  const method = stream.merge ? mergeStream : stream.stream ? nestedStream : stream.type ? eventStream : error('Invalid stream specification: ' + $(stream));
+  const method = stream.merge ? mergeStream : stream.stream ? nestedStream : stream.type ? eventStream : error('Invalid stream specification: ' + stringValue(stream));
   return method(stream, scope);
 }
 function eventSource(source) {
@@ -38229,7 +38558,7 @@ function streamParameters(entry, stream, scope) {
   let param = stream.between;
   if (param) {
     if (param.length !== 2) {
-      error('Stream "between" parameter must have 2 entries: ' + $(stream));
+      error('Stream "between" parameter must have 2 entries: ' + stringValue(stream));
     }
     entry.between = [parseStream(param[0], scope), parseStream(param[1], scope)];
   }
@@ -38302,7 +38631,7 @@ function parseUpdate(spec, scope, target) {
   }
   if (encode != null) {
     if (update) error('Signal encode and update are mutually exclusive.');
-    update = 'encode(item(),' + $(encode) + ')';
+    update = 'encode(item(),' + stringValue(encode) + ')';
   }
 
   // resolve update value
@@ -38387,7 +38716,7 @@ const MULTIDOMAIN_SORT_OPS = {
 function initScale(spec, scope) {
   const type = spec.type || 'linear';
   if (!isValidScaleType(type)) {
-    error('Unrecognized scale type: ' + $(type));
+    error('Unrecognized scale type: ' + stringValue(type));
   }
   scope.addScale(spec.name, {
     type,
@@ -38411,18 +38740,18 @@ function parseScale(spec, scope) {
     params.bins = parseScaleBins(spec.bins, scope);
   }
   for (key in spec) {
-    if (has$1(params, key) || key === 'name') continue;
+    if (hasOwnProperty(params, key) || key === 'name') continue;
     params[key] = parseLiteral(spec[key], scope);
   }
 }
 function parseLiteral(v, scope) {
-  return !isObject(v) ? v : v.signal ? scope.signalRef(v.signal) : error('Unsupported object: ' + $(v));
+  return !isObject(v) ? v : v.signal ? scope.signalRef(v.signal) : error('Unsupported object: ' + stringValue(v));
 }
 function parseArray(v, scope) {
   return v.signal ? scope.signalRef(v.signal) : v.map(v => parseLiteral(v, scope));
 }
 function dataLookupError(name) {
-  error('Can not find data set: ' + $(name));
+  error('Can not find data set: ' + stringValue(name));
 }
 
 // -- SCALE DOMAIN ----
@@ -38464,7 +38793,7 @@ function fieldRef(data, scope) {
       $ingest: data
     };
   } else if (data.signal) {
-    const code = 'setdata(' + $(name) + ',' + data.signal + ')';
+    const code = 'setdata(' + stringValue(name) + ',' + data.signal + ')';
     coll.params.input = scope.signalRef(code);
   }
   scope.addDataPipeline(name, [coll, Sieve({})]);
@@ -38586,7 +38915,7 @@ function parseScaleRange(spec, scope, params) {
   if (range.signal) {
     return scope.signalRef(range.signal);
   } else if (isString(range)) {
-    if (config && has$1(config, range)) {
+    if (config && hasOwnProperty(config, range)) {
       spec = extend$1({}, spec, {
         range: config[range]
       });
@@ -38602,7 +38931,7 @@ function parseScaleRange(spec, scope, params) {
         signal: 'height'
       }, 0];
     } else {
-      error('Unrecognized scale range value: ' + $(range));
+      error('Unrecognized scale range value: ' + stringValue(range));
     }
   } else if (range.scheme) {
     params.scheme = isArray(range.scheme) ? parseArray(range.scheme, scope) : parseLiteral(range.scheme, scope);
@@ -38615,7 +38944,7 @@ function parseScaleRange(spec, scope, params) {
   } else if (isDiscrete(spec.type) && !isArray(range)) {
     return parseScaleDomain(range, spec, scope);
   } else if (!isArray(range)) {
-    error('Unsupported range type: ' + $(range));
+    error('Unsupported range type: ' + stringValue(range));
   }
   return range.map(v => (isArray(v) ? parseArray : parseLiteral)(v, scope));
 }
@@ -38636,7 +38965,7 @@ function parseProjection(proj, scope) {
   scope.addProjection(proj.name, params);
 }
 function parseParameter$1(_, name, scope) {
-  return isArray(_) ? _.map(_ => parseParameter$1(_, name, scope)) : !isObject(_) ? _ : _.signal ? scope.signalRef(_.signal) : name === 'fit' ? _ : error('Unsupported parameter object: ' + $(_));
+  return isArray(_) ? _.map(_ => parseParameter$1(_, name, scope)) : !isObject(_) ? _ : _.signal ? scope.signalRef(_.signal) : name === 'fit' ? _ : error('Unsupported parameter object: ' + stringValue(_));
 }
 const Top = 'top';
 const Left = 'left';
@@ -38713,7 +39042,7 @@ function getStyle(name, scope, style) {
 function anchorExpr(s, e, m) {
   return `item.anchor === '${Start}' ? ${s} : item.anchor === '${End}' ? ${e} : ${m}`;
 }
-const alignExpr$1 = anchorExpr($(Left), $(Right), $(Center));
+const alignExpr$1 = anchorExpr(stringValue(Left), stringValue(Right), stringValue(Center));
 function tickBand(_) {
   const v = _('tickBand');
   let offset = _('tickOffset'),
@@ -39235,7 +39564,7 @@ function clip(clip, scope) {
   return expr ? scope.signalRef(expr) : !!clip;
 }
 function param(value) {
-  return isObject(value) && value.signal ? value.signal : $(value);
+  return isObject(value) && value.signal ? value.signal : stringValue(value);
 }
 function getRole(spec) {
   const role = spec.role || '';
@@ -39260,7 +39589,7 @@ function interactive(spec, scope) {
  */
 function parseTransform(spec, scope) {
   const def = definition$1(spec.type);
-  if (!def) error('Unrecognized transform type: ' + $(spec.type));
+  if (!def) error('Unrecognized transform type: ' + stringValue(spec.type));
   const t = entry(def.type.toLowerCase(), null, parseParameters(def, spec, scope));
   if (spec.signal) scope.addSignal(spec.signal, scope.proxy(t));
   t.metadata = def.metadata || {};
@@ -39290,7 +39619,7 @@ function parseParameter(def, spec, scope) {
     return parseIndexParameter(def, spec, scope);
   } else if (value === undefined) {
     if (def.required) {
-      error('Missing required ' + $(spec.type) + ' parameter: ' + $(def.name));
+      error('Missing required ' + stringValue(spec.type) + ' parameter: ' + stringValue(def.name));
     }
     return;
   } else if (type === 'param') {
@@ -39332,7 +39661,7 @@ function parseSubParameters(def, spec, scope) {
   if (def.array) {
     if (!isArray(value)) {
       // signals not allowed!
-      error('Expected an array of sub-parameters. Instead: ' + $(value));
+      error('Expected an array of sub-parameters. Instead: ' + stringValue(value));
     }
     return value.map(v => parseSubParameter(def, v, scope));
   } else {
@@ -39359,7 +39688,7 @@ function parseSubParameter(def, value, scope) {
     if (pdef) break;
   }
   // raise error if matching key not found
-  if (!pdef) error('Unsupported parameter: ' + $(value));
+  if (!pdef) error('Unsupported parameter: ' + stringValue(value));
 
   // parse params, create Params transform, return ref
   const params = extend$1(parseParameters(pdef, value, scope), pdef.key);
@@ -39554,10 +39883,10 @@ function parseFacet(spec, scope, group) {
     data = getDataRef(facet, scope);
   let op;
   if (!facet.name) {
-    error('Facet must have a name: ' + $(facet));
+    error('Facet must have a name: ' + stringValue(facet));
   }
   if (!facet.data) {
-    error('Facet must reference a data set: ' + $(facet));
+    error('Facet must reference a data set: ' + stringValue(facet));
   }
   if (facet.field) {
     op = scope.add(PreFacet({
@@ -39571,7 +39900,7 @@ function parseFacet(spec, scope, group) {
       pulse: data
     }));
   } else {
-    error('Facet must specify groupby or field: ' + $(facet));
+    error('Facet must specify groupby or field: ' + stringValue(facet));
   }
 
   // initialize facet subscope
@@ -40233,8 +40562,8 @@ const ifEnc = (test, a, b) => {
   b = b != null ? encoder(b) : b;
   if (isSimple(a) && isSimple(b)) {
     // if possible generate simple signal expression
-    a = a ? a.signal || $(a.value) : null;
-    b = b ? b.signal || $(b.value) : null;
+    a = a ? a.signal || stringValue(a.value) : null;
+    b = b ? b.signal || stringValue(b.value) : null;
     return {
       signal: `${test} ? (${a}) : (${b})`
     };
@@ -40252,7 +40581,7 @@ const ifExpr = (test, a, b) => ({
 const ifOrient = ($orient, t, b, l, r) => ({
   signal: (l != null ? `${$orient} === '${Left}' ? (${toExpr(l)}) : ` : '') + (b != null ? `${$orient} === '${Bottom}' ? (${toExpr(b)}) : ` : '') + (r != null ? `${$orient} === '${Right}' ? (${toExpr(r)}) : ` : '') + (t != null ? `${$orient} === '${Top}' ? (${toExpr(t)}) : ` : '') + '(null)'
 });
-const toExpr = v => isSignal(v) ? v.signal : v == null ? null : $(v);
+const toExpr = v => isSignal(v) ? v.signal : v == null ? null : stringValue(v);
 const mult = (sign, value) => value === 0 ? 0 : isSignal(sign) ? {
   signal: `(${sign.signal}) * ${value}`
 } : {
@@ -40266,9 +40595,9 @@ const patch = (value, base) => {
 };
 function fallback(prop, config, axisConfig, style) {
   let styleProp;
-  if (config && has$1(config, prop)) {
+  if (config && hasOwnProperty(config, prop)) {
     return config[prop];
-  } else if (has$1(axisConfig, prop)) {
+  } else if (hasOwnProperty(axisConfig, prop)) {
     return axisConfig[prop];
   } else if (prop.startsWith('title')) {
     switch (prop) {
@@ -40924,7 +41253,7 @@ function collectSignals(spec, config) {
 
   // add spec signal array
   array$5(spec.signals).forEach(s => {
-    if (has$1(pre, s.name)) {
+    if (hasOwnProperty(pre, s.name)) {
       // merge if built-in signal
       s = extend$1(pre[s.name], s);
     } else {
@@ -40936,7 +41265,7 @@ function collectSignals(spec, config) {
 
   // add config signal array
   array$5(config.signals).forEach(s => {
-    if (!has$1(map, s.name) && !has$1(pre, s.name)) {
+    if (!hasOwnProperty(map, s.name) && !hasOwnProperty(pre, s.name)) {
       // add to signal list if not already defined
       signals.push(s);
     }
@@ -41110,7 +41439,7 @@ Scope.prototype = Subscope.prototype = {
   fieldRef(field, name) {
     if (isString(field)) return fieldRef$1(field, name);
     if (!field.signal) {
-      error('Unsupported field reference: ' + $(field));
+      error('Unsupported field reference: ' + stringValue(field));
     }
     const s = field.signal;
     let f = this.field[s];
@@ -41172,25 +41501,25 @@ Scope.prototype = Subscope.prototype = {
   // ----
 
   hasOwnSignal(name) {
-    return has$1(this.signals, name);
+    return hasOwnProperty(this.signals, name);
   },
   addSignal(name, value) {
     if (this.hasOwnSignal(name)) {
-      error('Duplicate signal name: ' + $(name));
+      error('Duplicate signal name: ' + stringValue(name));
     }
     const op = value instanceof Entry ? value : this.add(operator(value));
     return this.signals[name] = op;
   },
   getSignal(name) {
     if (!this.signals[name]) {
-      error('Unrecognized signal name: ' + $(name));
+      error('Unrecognized signal name: ' + stringValue(name));
     }
     return this.signals[name];
   },
   signalRef(s) {
     if (this.signals[s]) {
       return ref(this.signals[s]);
-    } else if (!has$1(this.lambdas, s)) {
+    } else if (!hasOwnProperty(this.lambdas, s)) {
       this.lambdas[s] = this.add(operator(null));
     }
     return ref(this.lambdas[s]);
@@ -41220,7 +41549,7 @@ Scope.prototype = Subscope.prototype = {
   },
   addBinding(name, bind) {
     if (!this.bindings) {
-      error('Nested signals do not support binding: ' + $(name));
+      error('Nested signals do not support binding: ' + stringValue(name));
     }
     this.bindings.push(extend$1({
       signal: name
@@ -41229,8 +41558,8 @@ Scope.prototype = Subscope.prototype = {
   // ----
 
   addScaleProj(name, transform) {
-    if (has$1(this.scales, name)) {
-      error('Duplicate scale or projection name: ' + $(name));
+    if (hasOwnProperty(this.scales, name)) {
+      error('Duplicate scale or projection name: ' + stringValue(name));
     }
     this.scales[name] = this.add(transform);
   },
@@ -41242,7 +41571,7 @@ Scope.prototype = Subscope.prototype = {
   },
   getScale(name) {
     if (!this.scales[name]) {
-      error('Unrecognized scale name: ' + $(name));
+      error('Unrecognized scale name: ' + stringValue(name));
     }
     return this.scales[name];
   },
@@ -41261,20 +41590,20 @@ Scope.prototype = Subscope.prototype = {
   // ----
 
   addData(name, dataScope) {
-    if (has$1(this.data, name)) {
-      error('Duplicate data set name: ' + $(name));
+    if (hasOwnProperty(this.data, name)) {
+      error('Duplicate data set name: ' + stringValue(name));
     }
     return this.data[name] = dataScope;
   },
   getData(name) {
     if (!this.data[name]) {
-      error('Undefined data set name: ' + $(name));
+      error('Undefined data set name: ' + stringValue(name));
     }
     return this.data[name];
   },
   addDataPipeline(name, entries) {
-    if (has$1(this.data, name)) {
-      error('Duplicate data set name: ' + $(name));
+    if (hasOwnProperty(this.data, name)) {
+      error('Duplicate data set name: ' + stringValue(name));
     }
     return this.addData(name, DataScope.fromEntries(this, entries));
   }
@@ -41287,7 +41616,7 @@ function arrayLambda(array) {
   let code = '[';
   for (let i = 0; i < n; ++i) {
     const value = array[i];
-    code += (i > 0 ? ',' : '') + (isObject(value) ? value.signal || propertyLambda(value) : $(value));
+    code += (i > 0 ? ',' : '') + (isObject(value) ? value.signal || propertyLambda(value) : stringValue(value));
   }
   return code + ']';
 }
@@ -41298,7 +41627,7 @@ function objectLambda(obj) {
     value;
   for (key in obj) {
     value = obj[key];
-    code += (++i > 1 ? ',' : '') + $(key) + ':' + (isObject(value) ? value.signal || propertyLambda(value) : $(value));
+    code += (++i > 1 ? ',' : '') + stringValue(key) + ':' + (isObject(value) ? value.signal || propertyLambda(value) : stringValue(value));
   }
   return code + '}';
 }
@@ -41543,5 +41872,5 @@ function parse(spec, config, options) {
 extend$1(transforms, tx, vtx, encode$1, geo, force, label, tree, reg, voronoi, wordcloud, xf);
 const version = version$1;
 
-export { Bounds, CanvasHandler, CanvasRenderer, DATE, DAY, DAYOFYEAR, Dataflow, Debug, DisallowedObjectProperties, Error$1 as Error, EventStream, Gradient$1 as Gradient, GroupItem, HOURS, Handler, HybridHandler, HybridRenderer, Info, Item, MILLISECONDS, MINUTES, MONTH, Marks, MultiPulse, None$2 as None, Operator, Parameters, Pulse, QUARTER, RenderType, Renderer, ResourceLoader, SECONDS, SVGHandler, SVGRenderer, SVGStringRenderer, Scenegraph, TIME_UNITS, Transform, View$1 as View, WEEK, Warn, YEAR, accessor, accessorFields, accessorName, array$5 as array, ascending$2 as ascending, estimateBandwidth as bandwidthNRD, bin, bootstrapCI, boundClip, boundContext, boundItem$1 as boundItem, boundMark, boundStroke, changeset, clampRange, codegen as codegenExpression, compare$1 as compare, constant$5 as constant, cumulativeLogNormal, cumulativeNormal, cumulativeUniform, dayofyear, debounce, defaultLocale, definition$1 as definition, densityLogNormal, densityNormal, densityUniform, domChild, domClear, domCreate, domFind, dotbin, error, expressionFunction, extend$1 as extend, extent, extentIndex, falsy, fastmap, field$1 as field, flush, font, fontFamily, fontSize, format$2 as format, numberFormatDefaultLocale as formatLocale, formats$1 as formats, has$1 as hasOwnProperty, id, identity$6 as identity, inferType, inferTypes, ingest$1 as ingest, inherits, inrange, interpolate, interpolateColors, interpolateRange, intersect$2 as intersect, intersectBoxLine, intersectPath, intersectPoint, intersectRule, isArray, isBoolean$1 as isBoolean, isDate$1 as isDate, isFunction, isIterable, isNumber$1 as isNumber, isObject, isRegExp, isString, isTuple, key, lerp, lineHeight, loader, locale, logger, lruCache, markup, merge$3 as merge, mergeConfig, multiLineOffset, one$2 as one, pad$2 as pad, panLinear, panLog, panPow, panSymlog, parse, parser$1 as parseExpression, eventSelector as parseSelector, path$3 as path, curves as pathCurves, pathEqual, parse$3 as pathParse, vg_rect as pathRectangle, pathRender, symbols as pathSymbols, vg_trail as pathTrail, peek$1 as peek, point, projection, quantileLogNormal, quantileNormal, quantileUniform, quantiles, quantizeInterpolator, quarter, quartiles, random, integer as randomInteger, kde as randomKDE, lcg$2 as randomLCG, lognormal as randomLogNormal, mixture$1 as randomMixture, gaussian as randomNormal, uniform as randomUniform, read, constant$4 as regressionConstant, exp$1 as regressionExp, linear$2 as regressionLinear, loess as regressionLoess, log$3 as regressionLog, poly as regressionPoly, pow$3 as regressionPow, quad as regressionQuad, renderModule, repeat, resetDefaultLocale, resetSVGDefIds, responseType, context as runtimeContext, sampleCurve, sampleLogNormal, sampleNormal, sampleUniform, scale$4 as scale, sceneEqual, sceneFromJSON, pickVisit as scenePickVisit, sceneToJSON, visit as sceneVisit, zorder as sceneZOrder, scheme, serializeXML, setHybridRendererOptions, setRandom, span, splitAccessPath, $ as stringValue, textMetrics, bin$1 as timeBin, timeFloor, timeFormatDefaultLocale as timeFormatLocale, timeInterval, timeOffset, timeSequence, timeUnitSpecifier, timeUnits, toBoolean, toDate, toNumber, toSet, toString, transform$2 as transform, transforms, truncate$1 as truncate, truthy, tupleid, typeParsers, utcFloor, utcInterval, utcOffset, utcSequence, utcdayofyear, utcquarter, utcweek, version, visitArray, week, writeConfig, zero$3 as zero, zoomLinear, zoomLog, zoomPow, zoomSymlog };
+export { Bounds$1 as Bounds, CanvasHandler, CanvasRenderer, DATE, DAY, DAYOFYEAR, Dataflow, Debug, DisallowedObjectProperties, Error$1 as Error, EventStream, Gradient$1 as Gradient, GroupItem, HOURS, Handler, HybridHandler, HybridRenderer, Info, Item, MILLISECONDS, MINUTES, MONTH, Marks, MultiPulse, None$2 as None, Operator, Parameters, Pulse, QUARTER, RenderType, Renderer, ResourceLoader, SECONDS, SVGHandler, SVGRenderer, SVGStringRenderer, Scenegraph, TIME_UNITS, Transform, View$1 as View, WEEK, Warn, YEAR, accessor, accessorFields, accessorName, array$5 as array, ascending$2 as ascending, estimateBandwidth as bandwidthNRD, bin, bootstrapCI, boundClip, boundContext, boundItem$1 as boundItem, boundMark, boundStroke, changeset, clampRange, codegen as codegenExpression, compare$1 as compare, constant$5 as constant, cumulativeLogNormal, cumulativeNormal, cumulativeUniform, dayofyear, debounce, defaultLocale, definition$1 as definition, densityLogNormal, densityNormal, densityUniform, detectTimeUnits, domChild, domClear, domCreate, domFind, dotbin, error, expressionFunction, extend$1 as extend, extent, extentIndex, falsy, fastmap, field$1 as field, flush, font, fontFamily, fontSize, format$2 as format, numberFormatDefaultLocale as formatLocale, formats$1 as formats, hasOwnProperty, id, identity$7 as identity, inferType, inferTypes, ingest$1 as ingest, inherits, inrange, interpolate, interpolateColors, interpolateRange, intersect$2 as intersect, intersectBoxLine, intersectPath, intersectPoint, intersectRule, isArray, isBoolean$1 as isBoolean, isDate$1 as isDate, isFunction, isIterable, isNumber$1 as isNumber, isObject, isRegExp, isString, isTuple, key, lerp, lineHeight, loader, locale, logger, lruCache, markup, merge$3 as merge, mergeConfig, multiLineOffset, one$2 as one, pad$2 as pad, panLinear, panLog, panPow, panSymlog, parse, parser$1 as parseExpression, eventSelector as parseSelector, path$3 as path, curves as pathCurves, pathEqual, parse$3 as pathParse, vg_rect as pathRectangle, pathRender, symbols as pathSymbols, vg_trail as pathTrail, peek$1 as peek, point, projection, quantileLogNormal, quantileNormal, quantileUniform, quantiles, quantizeInterpolator, quarter, quartiles, random, integer as randomInteger, kde as randomKDE, lcg$2 as randomLCG, lognormal as randomLogNormal, mixture$1 as randomMixture, gaussian as randomNormal, uniform as randomUniform, read, constant$4 as regressionConstant, exp$1 as regressionExp, linear$2 as regressionLinear, loess as regressionLoess, log$3 as regressionLog, poly as regressionPoly, pow$3 as regressionPow, quad as regressionQuad, renderModule, repeat, resetDefaultLocale, resetSVGDefIds, responseType, context as runtimeContext, sampleCurve, sampleLogNormal, sampleNormal, sampleUniform, scale$4 as scale, sceneEqual, sceneFromJSON, pickVisit as scenePickVisit, sceneToJSON, visit as sceneVisit, zorder as sceneZOrder, scheme, serializeXML, setHybridRendererOptions, setRandom, span, splitAccessPath, stringValue, textMetrics, bin$1 as timeBin, timeFloor, timeFormatDefaultLocale as timeFormatLocale, timeInterval, timeOffset, timeSequence, timeUnitSpecifier, timeUnits, toBoolean, toDate, toNumber, toSet, toString, transform$2 as transform, transforms, truncate$1 as truncate, truthy, tupleid, typeParsers, utcFloor, utcInterval, utcOffset, utcSequence, utcdayofyear, utcquarter, utcweek, version, visitArray, week, writeConfig, zero$3 as zero, zoomLinear, zoomLog, zoomPow, zoomSymlog };
 //# sourceMappingURL=vega.module.js.map
