@@ -1,6 +1,6 @@
 {
   "name": "vega",
-  "version": "6.3.1-omni.1",
+  "version": "6.4.0-omni.0",
   "description": "The Vega visualization grammar.",
   "license": "BSD-3-Clause",
   "type": "module",
@@ -19,6 +19,6 @@
     "url": "git+https://github.com/vega/vega.git"
   },
   "dependencies": {
-    "vega-typings": "~2.2.0"
+    "vega-typings": "~2.3.0"
   }
 }
