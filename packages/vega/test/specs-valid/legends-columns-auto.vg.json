@@ -1,0 +1,84 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Symbol legend entries wrapped into as many columns as fit maxWidth.",
+  "width": 300,
+  "height": 120,
+  "padding": 5,
+  "autosize": "pad",
+
+  "data": [
+    {
+      "name": "source",
+      "values": [
+        {"x": 1, "y": 3, "c": "Alpha"},
+        {"x": 2, "y": 5, "c": "Bravo"},
+        {"x": 3, "y": 2, "c": "Charlie"},
+        {"x": 4, "y": 6, "c": "Delta"},
+        {"x": 5, "y": 4, "c": "Echo"},
+        {"x": 6, "y": 7, "c": "Foxtrot"},
+        {"x": 7, "y": 1, "c": "Golf"},
+        {"x": 8, "y": 5, "c": "Hotel"},
+        {"x": 9, "y": 3, "c": "India"},
+        {"x": 10, "y": 6, "c": "Juliett"}
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {"data": "source", "field": "x"},
+      "range": "width"
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {"data": "source", "field": "y"},
+      "range": "height"
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "range": {"scheme": "category10"},
+      "domain": {"data": "source", "field": "c"}
+    }
+  ],
+
+  "axes": [
+    {"scale": "x", "orient": "bottom"},
+    {"scale": "y", "orient": "left"}
+  ],
+
+  "legends": [
+    {
+      "fill": "color",
+      "title": "Wrapped",
+      "orient": "bottom",
+      "direction": "horizontal",
+      "columns": "auto",
+      "maxWidth": 220
+    },
+    {
+      "fill": "color",
+      "title": "Column",
+      "orient": "right",
+      "columns": "auto",
+      "maxWidth": 220
+    }
+  ],
+
+  "marks": [
+    {
+      "type": "symbol",
+      "from": {"data": "source"},
+      "encode": {
+        "update": {
+          "x": {"scale": "x", "field": "x"},
+          "y": {"scale": "y", "field": "y"},
+          "fill": {"scale": "color", "field": "c"}
+        }
+      }
+    }
+  ]
+}

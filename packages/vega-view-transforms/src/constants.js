@@ -42,6 +42,7 @@ export const Pad  = 'pad';
 export const None = 'none';
 
 export const All = 'all';
+export const Auto = 'auto';
 export const Each = 'each';
 export const Flush = 'flush';
 

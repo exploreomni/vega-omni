@@ -1,4 +1,4 @@
-import {Center, End, Left, Right, Start, Vertical} from './constants.js';
+import {Auto, Center, End, Left, Right, Start, Vertical} from './constants.js';
 import {value} from '../../util.js';
 import {isObject, stringValue} from 'vega-util';
 
@@ -20,10 +20,10 @@ export function lookup(spec, config) {
     config.gradientThickness || config.gradientHeight
   );
 
-  _.entryColumns = () => value(
-    spec.columns,
-    value(config.columns, +_.isVertical(true))
-  );
+  _.entryColumns = () => {
+    const columns = value(spec.columns, value(config.columns, +_.isVertical(true)));
+    return columns === Auto && _.isVertical(true) ? 1 : columns;
+  };
 
   return _;
 }

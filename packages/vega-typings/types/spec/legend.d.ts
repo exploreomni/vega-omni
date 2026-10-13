@@ -313,8 +313,14 @@ export interface BaseLegend {
 
   /**
    * The number of columns in which to arrange symbol legend entries. A value of `0` or lower indicates a single row with one column per entry.
+   * The value `"auto"` arranges a horizontal legend into as many columns as fit within `maxWidth`; a vertical legend uses a single column.
    */
-  columns?: number | SignalRef;
+  columns?: number | 'auto' | SignalRef;
+
+  /**
+   * The maximum width in pixels of a symbol legend with `columns: "auto"`, including padding.
+   */
+  maxWidth?: NumberValue;
 
   /**
    * The horizontal padding in pixels between symbol legend entries.

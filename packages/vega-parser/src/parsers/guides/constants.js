@@ -5,6 +5,7 @@ export const Bottom = 'bottom';
 export const Center = 'center';
 
 export const Vertical = 'vertical';
+export const Auto = 'auto';
 
 export const Start = 'start';
 export const Middle = 'middle';

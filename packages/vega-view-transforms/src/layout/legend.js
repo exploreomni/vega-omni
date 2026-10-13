@@ -1,8 +1,9 @@
 import {
-  Bottom, BottomLeft, BottomRight, Bounds, Each, End, Flush, Group, Left,
-  Middle, None, Right, Start, Symbols, Top,
+  All, Auto, Bottom, BottomLeft, BottomRight, Bounds, Column, Each, End,
+  Flush, Group, Left, Middle, None, Right, Start, Symbols, Top,
   TopLeft, TopRight
 } from '../constants.js';
+import {bboxFull, get, gridLayoutGroups} from './grid.js';
 import {boundStroke, multiLineOffset} from 'vega-scenegraph';
 
 // utility for looking up legend layout configuration
@@ -84,6 +85,53 @@ export function legendParams(g, orient, config, xb, yb, w, h) {
   }
 
   return p;
+}
+
+/**
+ * Resolve `columns: "auto"` for a legend entry group: the most columns whose
+ * grid fits the legend's maxWidth, measured as gridLayout will place them.
+ * Entries get row and column in row-major order.
+ */
+export function legendEntryColumns(group, opt) {
+  if (opt.columns !== Auto) return opt;
+
+  const legend = group.mark.group,
+        entries = gridLayoutGroups(group).marks,
+        avail = (legend.maxWidth != null ? legend.maxWidth : Infinity)
+          - 2 * (legend.padding || 0),
+        columns = fitColumns(entries.map(bboxFull), avail,
+          get(opt.align, Column), get(opt.padding, Column));
+
+  entries.forEach((g, i) => {
+    g.column = i % columns;
+    g.row = Math.floor(i / columns);
+  });
+
+  return {...opt, columns};
+}
+
+export function fitColumns(boxes, avail, align, padding) {
+  const n = boxes.length,
+        widths = boxes.map(b => Math.ceil(b.x2)),
+        insets = boxes.map(b => b.x1 < 0 ? Math.ceil(-b.x1) : 0),
+        wmax = Math.max(0, ...widths);
+
+  // total width of an n-entry grid with ncols columns
+  const width = ncols => {
+    let w = 0, c, i, cw, ci;
+    for (c = 0; c < ncols; ++c) {
+      for (cw = 0, ci = 0, i = c; i < n; i += ncols) {
+        cw = Math.max(cw, widths[i]);
+        ci = Math.max(ci, insets[i]);
+      }
+      w += (align === All ? wmax : cw) + (c ? padding + ci : 0);
+    }
+    return w;
+  };
+
+  let ncols = n;
+  while (ncols > 1 && width(ncols) > avail) --ncols;
+  return Math.max(1, ncols);
 }
 
 export function legendLayout(view, legend) {

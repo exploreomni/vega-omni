@@ -1,6 +1,6 @@
 import {addEncoders, extendEncode} from './encode/util.js';
 import {
-  Discrete, Gradient,
+  Auto, Discrete, Gradient,
   GuideLabelStyle, LegendScales, Skip, Symbols
 } from './guides/constants.js';
 import guideGroup from './guides/guide-group.js';
@@ -89,8 +89,10 @@ export default function(spec, scope) {
   else {
     // determine legend symbol group layout
     entryLayout = legendSymbolLayout(spec, config);
+    // auto columns are resolved at layout time; encoders only need a non-zero count
+    const columns = entryLayout.columns === Auto ? 1 : deref(entryLayout.columns);
     children = [
-      legendSymbolGroups(spec, config, encode, entryRef, deref(entryLayout.columns))
+      legendSymbolGroups(spec, config, encode, entryRef, columns)
     ];
     // pass symbol size information to legend entry generator
     params.size = sizeExpression(spec, scope, children[0].marks);
@@ -164,6 +166,7 @@ function buildLegendEncode(_, spec, config) {
     strokeDash:   config.strokeDash,
     x:            _('legendX'),
     y:            _('legendY'),
+    maxWidth:     _('maxWidth'),
 
     // accessibility support
     format:       spec.format,

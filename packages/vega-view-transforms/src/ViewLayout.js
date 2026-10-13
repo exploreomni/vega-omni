@@ -7,7 +7,7 @@ import {
 
 import {axisLayout, isYAxis} from './layout/axis.js';
 import {gridLayout, trellisLayout} from './layout/grid.js';
-import {legendLayout, legendParams} from './layout/legend.js';
+import {legendEntryColumns, legendLayout, legendParams} from './layout/legend.js';
 import {titleLayout} from './layout/title.js';
 
 import {Transform} from 'vega-dataflow';
@@ -29,7 +29,7 @@ inherits(ViewLayout, Transform, {
   transform(_, pulse) {
     const view = pulse.dataflow;
     _.mark.items.forEach(group => {
-      if (_.layout) trellisLayout(view, group, _.layout);
+      if (_.layout) trellisLayout(view, group, legendEntryColumns(group, _.layout));
       layoutGroup(view, group, _);
     });
     return shouldReflow(_.mark.group) ? pulse.reflow() : pulse;

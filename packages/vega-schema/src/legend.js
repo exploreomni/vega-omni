@@ -4,8 +4,8 @@ import {
   alignValue, allOf, anchorValue, anyOf, arrayOrSignal,
   baselineValue, booleanType, colorValue, dashArrayValue, def,
   enums, fontWeightValue, formatTypeOrSignal, formatTypeType,
-  numberOrSignal, numberType, numberValue, object, orSignal,
-  orientValue, pattern, required, stringType, stringValue,
+  numberOrSignal, numberType, numberValue, object, oneOf, orSignal,
+  orientValue, pattern, required, signalRef, stringType, stringValue,
   textOrSignal, type
 } from './util.js';
 
@@ -102,7 +102,8 @@ const legendProps = object({
 
   // SYMBOL LAYOUT CONFIG
   clipHeight: numberOrSignal,
-  columns: numberOrSignal,
+  columns: oneOf(numberType, enums(['auto']), signalRef),
+  maxWidth: numberValue,
   columnPadding: numberOrSignal,
   rowPadding: numberOrSignal,
   gridAlign: layoutAlign,
