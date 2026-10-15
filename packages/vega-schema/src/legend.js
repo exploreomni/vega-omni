@@ -2,7 +2,7 @@ import {layoutAlign} from './layout.js';
 
 import {
   alignValue, allOf, anchorValue, anyOf, arrayOrSignal,
-  baselineValue, booleanType, colorValue, dashArrayValue, def,
+  baselineValue, booleanType, booleanValue, colorValue, dashArrayValue, def,
   enums, fontWeightValue, formatTypeOrSignal, formatTypeType,
   numberOrSignal, numberType, numberValue, object, oneOf, orSignal,
   orientValue, pattern, required, signalRef, stringType, stringValue,
@@ -135,6 +135,7 @@ const legendProps = object({
   labelFontWeight: fontWeightValue,
   labelLimit: numberValue,
   labelOffset: numberValue,
+  labelWrap: booleanValue,
   labelOpacity: numberValue,
   labelOverlap: labelOverlapRef,
   labelSeparation: numberOrSignal,

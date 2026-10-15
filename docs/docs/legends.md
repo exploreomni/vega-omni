@@ -55,6 +55,7 @@ Properties for specifying a legend. Legends accept one or more [scales](../scale
 | labelFontWeight | {% include type t="String|Number" %} | Font weight of legend labels. |
 | labelLimit    | {% include type t="Number" %}  | The maximum allowed length in pixels of legend labels. |
 | labelOffset   | {% include type t="Number" %}  | Offset in pixels between legend labels their corresponding symbol or gradient. |
+| labelWrap     | {% include type t="Boolean" %} | Whether symbol legend labels wider than _labelLimit_ wrap onto further lines instead of being truncated. |
 | labelOpacity  | {% include type t="Number" %}  | Opacity of legend labels. {% include tag ver="4.1" %} |
 | labelOverlap  | {% include type t="Boolean|String" %} | The strategy to use for resolving overlap of labels in gradient legends. If `false`, no overlap reduction is attempted. If set to `true` (default) or `"parity"`, a strategy of removing every other label is used. If set to `"greedy"`, a linear scan of the labels is performed, removing any label that overlaps with the last visible label.|
 |labelSeparation| {% include type t="Number" %}  | The minimum separation that must be between label bounding boxes for them to be considered non-overlapping (default `0`). This property is ignored if *labelOverlap* resolution is not enabled. {% include tag ver="5.0" %} |

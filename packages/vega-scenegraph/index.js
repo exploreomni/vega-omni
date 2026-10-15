@@ -44,6 +44,7 @@ export {
   fontSize,
   lineHeight,
   multiLineOffset,
+  textLines,
   textMetrics
 } from './src/util/text.js';
 

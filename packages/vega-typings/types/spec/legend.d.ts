@@ -12,6 +12,7 @@ import { LayoutAlign } from './layout.js';
 import {
   AlignValue,
   AnchorValue,
+  BooleanValue,
   ColorValue,
   DashArrayValue,
   FontStyleValue,
@@ -471,6 +472,11 @@ export interface BaseLegend {
    * __Default value:__ `160`.
    */
   labelLimit?: NumberValue;
+
+  /**
+   * Whether symbol legend labels wider than `labelLimit` wrap onto further lines instead of being truncated.
+   */
+  labelWrap?: BooleanValue;
 
   /**
    * Opacity of labels.
