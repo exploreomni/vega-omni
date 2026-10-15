@@ -10860,7 +10860,7 @@
         state.update(w, data[i]);
       }
     }
-    function clamp$1(x, lo, hi) {
+    function clamp$2(x, lo, hi) {
       return x < lo ? lo : x > hi ? hi : x;
     }
     function setWindow(w, f, i, n) {
@@ -10874,8 +10874,8 @@
       // f[1]: end offset (inclusive in “row terms”), so we +1 for exclusive bound.
       // null => unbounded (n)
       const endExclusive = f[1] == null ? n : i + f[1] + 1;
-      w.i0 = clamp$1(start, 0, n);
-      w.i1 = clamp$1(endExclusive, 0, n);
+      w.i0 = clamp$2(start, 0, n);
+      w.i1 = clamp$2(endExclusive, 0, n);
       w.index = i;
     }
 
@@ -15841,7 +15841,7 @@
     function number$3(_) {
       return typeof _ === 'function' ? _ : () => +_;
     }
-    function clamp(value, min, max) {
+    function clamp$1(value, min, max) {
       return Math.max(min, Math.min(value, max));
     }
     function vg_rect() {
@@ -15861,10 +15861,10 @@
           w = +width.call(this, _),
           h = +height.call(this, _),
           s = Math.min(w, h) / 2,
-          tl = clamp(+crTL.call(this, _), 0, s),
-          tr = clamp(+crTR.call(this, _), 0, s),
-          bl = clamp(+crBL.call(this, _), 0, s),
-          br = clamp(+crBR.call(this, _), 0, s);
+          tl = clamp$1(+crTL.call(this, _), 0, s),
+          tr = clamp$1(+crTR.call(this, _), 0, s),
+          bl = clamp$1(+crBL.call(this, _), 0, s),
+          br = clamp$1(+crBR.call(this, _), 0, s);
         if (!context) context = buffer = path$3();
         if (tl <= 0 && tr <= 0 && bl <= 0 && br <= 0) {
           context.rect(x1, y1, w, h);
@@ -18214,12 +18214,12 @@
     const MouseOverEvent = 'mouseover';
     const ClickEvent = 'click';
     const DoubleClickEvent = 'dblclick';
-    const WheelEvent = 'wheel';
+    const WheelEvent$1 = 'wheel';
     const MouseWheelEvent = 'mousewheel';
     const TouchStartEvent = 'touchstart';
     const TouchMoveEvent = 'touchmove';
     const TouchEndEvent = 'touchend';
-    const Events = [KeyDownEvent, KeyPressEvent, KeyUpEvent, DragEnterEvent, DragLeaveEvent, DragOverEvent, PointerDownEvent, PointerUpEvent, PointerMoveEvent, PointerOutEvent, PointerOverEvent, MouseDownEvent, MouseUpEvent, MouseMoveEvent, MouseOutEvent, MouseOverEvent, ClickEvent, DoubleClickEvent, WheelEvent, MouseWheelEvent, TouchStartEvent, TouchMoveEvent, TouchEndEvent];
+    const Events = [KeyDownEvent, KeyPressEvent, KeyUpEvent, DragEnterEvent, DragLeaveEvent, DragOverEvent, PointerDownEvent, PointerUpEvent, PointerMoveEvent, PointerOutEvent, PointerOverEvent, MouseDownEvent, MouseUpEvent, MouseMoveEvent, MouseOutEvent, MouseOverEvent, ClickEvent, DoubleClickEvent, WheelEvent$1, MouseWheelEvent, TouchStartEvent, TouchMoveEvent, TouchEndEvent];
     const TooltipShowEvent = PointerMoveEvent;
     const TooltipHideEvent = MouseOutEvent;
     const HrefEvent = ClickEvent;
@@ -18640,7 +18640,7 @@
 
     // these roles are covered by related roles
     // we can ignore them, no need to generate attributes
-    const AriaIgnore = toSet(['axis-domain', 'axis-grid', 'axis-label', 'axis-tick', 'axis-title', 'legend-band', 'legend-entry', 'legend-gradient', 'legend-label', 'legend-title', 'legend-symbol', 'title']);
+    const AriaIgnore = toSet(['axis-domain', 'axis-grid', 'axis-label', 'axis-tick', 'axis-title', 'legend-band', 'legend-entry', 'legend-gradient', 'legend-label', 'legend-scrollbar', 'legend-title', 'legend-symbol', 'title']);
 
     // aria attribute generators for guide roles
     const AriaGuides = {
@@ -20089,6 +20089,7 @@
     const Pad = 'pad';
     const None = 'none';
     const All = 'all';
+    const Auto$1 = 'auto';
     const Each = 'each';
     const Flush = 'flush';
     const Column = 'column';
@@ -20887,6 +20888,125 @@
       // queue title for redraw
       view.dirty(g);
     }
+    const LegendRole$2 = 'legend',
+      ScrollbarRole = 'legend-scrollbar',
+      WheelEvent = 'wheel',
+      LineHeight = 16;
+    const clamp = (v, max) => Math.max(0, Math.min(max, v || 0));
+
+    /**
+     * Size a symbol legend's entry group to a height budget. Entries that
+     * overflow are clipped and offset by the legend's scroll position. Runs
+     * before the title is placed, as the viewport leaves room for the title.
+     */
+    function legendScrollLayout(view, item, entry, maxHeight) {
+      const scope = entry.items[0],
+        title = item.datum.title ? item.items[1].items[0] : null,
+        stacked = title && title.orient !== Left$1 && title.orient !== Right$1,
+        pad = item.padding || 0,
+        bar = item.scrollbarWidth || 0,
+        viewHeight = Math.floor(maxHeight - 2 * pad - (stacked ? title.bounds.height() + (item.titlePadding || 0) : 0)),
+        contentHeight = Math.ceil(scope.bounds.y2 + (entry._scrollY || 0)),
+        max = contentHeight - viewHeight;
+      item._scrollMax = Math.max(0, max);
+      item._scrollView = viewHeight;
+      item._scroll = max > 0 ? clamp(item._scroll, max) : 0;
+      scrollEntries(view, entry, item._scroll);
+      if (max > 0) legendScrollEvents(view);
+      if (max > 0) {
+        entry.clip = true;
+        entry.width = Math.ceil(scope.bounds.x2) + 2 * bar;
+        entry.height = viewHeight;
+        entry.bounds.set(entry.x, entry.y, entry.x + entry.width, entry.y + entry.height);
+      } else {
+        entry.clip = false;
+        entry.width = entry.height = 0;
+        entry.bounds.clear().union(scope.bounds).translate(entry.x, entry.y);
+      }
+      entry.mark.bounds.clear().union(entry.bounds);
+      view.dirty(entry);
+    }
+
+    /**
+     * Shift the entries of a legend entry group so that `scroll` pixels of
+     * content sit above the viewport. The offset applied so far is kept on the
+     * group, so repeat calls move entries by the difference only.
+     */
+    function scrollEntries(view, entry, scroll) {
+      const scope = entry.items[0],
+        dy = scroll - (entry._scrollY || 0);
+      if (!dy) return;
+      scope.items.forEach(g => {
+        g.y -= dy;
+        g.bounds.translate(0, -dy);
+        view.dirty(g);
+      });
+      scope.bounds.translate(0, -dy);
+      entry._scrollY = scroll;
+    }
+
+    /** The viewport a scrollable legend keeps when a column is short of room. */
+    const MinViewHeight = 40;
+
+    /** Split `excess` across entries in proportion to how much each can give. */
+    function shrink(reducible, excess) {
+      const total = reducible.reduce((a, b) => a + b, 0),
+        take = Math.min(excess, total);
+      return reducible.map(r => total ? Math.round(take * r / total) : 0);
+    }
+
+    /**
+     * Register the view's wheel listener once a legend can scroll. Handlers run
+     * inside the browser's event dispatch, so preventDefault lands before the
+     * page scrolls; a wheel past either end is left to the page.
+     */
+    function legendScrollEvents(view) {
+      if (view._legendScroll || !view.addEventListener) return;
+      view._legendScroll = true;
+      view.addEventListener(WheelEvent, (evt, item) => {
+        const legend = scrollableLegend(item);
+        if (!legend) return;
+        const scroll = clamp(legend._scroll + wheelDelta(evt, legend._scrollView), legend._scrollMax);
+        if (scroll === legend._scroll) return;
+        evt.preventDefault();
+        legend._scroll = scroll;
+        const entry = legend.items[0].items[0];
+        scrollEntries(view, entry, scroll);
+        view.dirty(entry);
+        legendScrollbarLayout(view, legend, entry);
+        view.runAsync();
+      });
+    }
+    function scrollableLegend(item) {
+      for (; item; item = item.mark.group) {
+        if (item.mark.role === LegendRole$2) return item._scrollMax > 0 ? item : null;
+      }
+      return null;
+    }
+    function wheelDelta(evt, viewHeight) {
+      return evt.deltaMode === 1 ? evt.deltaY * LineHeight : evt.deltaMode === 2 ? evt.deltaY * viewHeight : evt.deltaY;
+    }
+
+    /**
+     * Place the scrollbar thumb along the right edge of the entry viewport.
+     */
+    function legendScrollbarLayout(view, item, entry) {
+      const mark = item.items.find(m => m.role === ScrollbarRole),
+        thumb = mark && mark.items[0];
+      if (!thumb) return;
+      const max = item._scrollMax,
+        viewHeight = item._scrollView,
+        w = item.scrollbarWidth || 0,
+        h = max > 0 ? Math.max(2 * w, Math.round(viewHeight * viewHeight / (viewHeight + max))) : 0;
+      view.dirty(thumb);
+      thumb.width = max > 0 ? w : 0;
+      thumb.height = h;
+      thumb.x = entry.x + entry.width - thumb.width;
+      thumb.y = entry.y + (max > 0 ? Math.round((viewHeight - h) * item._scroll / max) : 0);
+      Marks.rect.bound(thumb.bounds.clear(), thumb);
+      mark.bounds.clear().union(thumb.bounds);
+      view.dirty(thumb);
+    }
 
     // utility for looking up legend layout configuration
     function lookup$3(config, orient) {
@@ -20980,7 +21100,56 @@
       }
       return p;
     }
-    function legendLayout(view, legend) {
+
+    /**
+     * Resolve `columns: "auto"` for a legend entry group: the most columns whose
+     * grid fits the legend's maxWidth, measured the way gridLayout will place
+     * them. Entries are assigned row and column in row-major order.
+     */
+    function legendEntryColumns(group, opt) {
+      if (opt.columns !== Auto$1) return opt;
+      const legend = group.mark.group,
+        entries = gridLayoutGroups(group).marks,
+        // a scrollable legend keeps its scrollbar gutter whether or not it overflows
+        gutter = legend.maxHeight != null ? 2 * (legend.scrollbarWidth || 0) : 0,
+        avail = (legend.maxWidth != null ? legend.maxWidth : Infinity) - 2 * (legend.padding || 0) - gutter,
+        columns = fitColumns(entries.map(bboxFull), avail, get$1(opt.align, Column), get$1(opt.padding, Column));
+      entries.forEach((g, i) => {
+        g.column = i % columns;
+        g.row = Math.floor(i / columns);
+      });
+      return {
+        ...opt,
+        columns
+      };
+    }
+    function fitColumns(boxes, avail, align, padding) {
+      const n = boxes.length,
+        widths = boxes.map(b => Math.ceil(b.x2)),
+        insets = boxes.map(b => b.x1 < 0 ? Math.ceil(-b.x1) : 0),
+        wmax = Math.max(0, ...widths);
+
+      // total width of an n-entry grid with ncols columns
+      const width = ncols => {
+        let w = 0,
+          c,
+          i,
+          cw,
+          ci;
+        for (c = 0; c < ncols; ++c) {
+          for (cw = 0, ci = 0, i = c; i < n; i += ncols) {
+            cw = Math.max(cw, widths[i]);
+            ci = Math.max(ci, insets[i]);
+          }
+          w += (align === All ? wmax : cw) + (c ? padding + ci : 0);
+        }
+        return w;
+      };
+      let ncols = n;
+      while (ncols > 1 && width(ncols) > avail) --ncols;
+      return Math.max(1, ncols);
+    }
+    function legendLayout(view, legend, maxHeight) {
       var item = legend.items[0],
         datum = item.datum,
         orient = item.orient,
@@ -20993,9 +21162,17 @@
       // cache current bounds for later comparison
       item._bounds ? item._bounds.clear().union(bounds) : item._bounds = bounds.clone();
       bounds.clear();
+      const entry = item.items[0].items[0],
+        scroll = datum.type === Symbols$1 && item.maxHeight != null;
+
+      // clip entries to maxHeight before the title is placed against them
+      if (scroll) {
+        legendScrollLayout(view, item, entry, maxHeight != null ? maxHeight : item.maxHeight);
+      }
 
       // adjust legend to accommodate padding and title
-      legendGroupLayout(view, item, item.items[0].items[0]);
+      legendGroupLayout(view, item, entry);
+      if (scroll) legendScrollbarLayout(view, item, entry);
 
       // aggregate bounds to determine size, and include origin
       bounds = legendBounds(item, bounds);
@@ -21017,6 +21194,24 @@
       boundStroke(bounds.set(x, y, x + w, y + h), item);
       item.mark.bounds.clear().union(bounds);
       return item;
+    }
+
+    /**
+     * Fit the legends stacked in one orient column within the largest
+     * maxHeight among them. Legends without a maxHeight keep their height;
+     * the scrollable ones give up viewport in proportion to what they have,
+     * down to MinViewHeight, and are laid out again at the reduced budget.
+     */
+    function legendColumnLayout(view, legends, margin) {
+      const items = legends.map(mark => mark.items[0]),
+        budget = Math.max(...items.map(item => item.maxHeight != null ? item.maxHeight : -Infinity));
+      if (!(budget > 0)) return;
+      const excess = items.reduce((h, item) => h + item.height, margin * (items.length - 1)) - budget;
+      if (excess <= 0) return;
+      const reducible = items.map(item => item.maxHeight != null ? Math.max(0, item.items[0].items[0].bounds.height() - MinViewHeight) : 0);
+      shrink(reducible, excess).forEach((dh, i) => {
+        if (dh > 0) legendLayout(view, legends[i], items[i].height - dh);
+      });
     }
     function legendBounds(item, b) {
       // aggregate item bounds
@@ -21207,7 +21402,10 @@
       transform(_, pulse) {
         const view = pulse.dataflow;
         _.mark.items.forEach(group => {
-          if (_.layout) trellisLayout(view, group, _.layout);
+          if (_.layout) {
+            trellisLayout(view, group, legendEntryColumns(group, _.layout));
+            group._scrollY = 0; // the grid put entries back at their unscrolled positions
+          }
           layoutGroup(view, group, _);
         });
         return shouldReflow(_.mark.group) ? pulse.reflow() : pulse;
@@ -21277,8 +21475,12 @@
 
         // perform grid layout for each orient group
         for (const orient in l) {
-          const g = l[orient];
-          gridLayout(view, g, legendParams(g, orient, _.legends, xBounds, yBounds, width, height));
+          const g = l[orient],
+            params = legendParams(g, orient, _.legends, xBounds, yBounds, width, height);
+          if (params.columns === 1 && g.length > 1) {
+            legendColumnLayout(view, g.map(item => item.mark), params.padding);
+          }
+          gridLayout(view, g, params);
         }
 
         // update view bounds
@@ -38601,6 +38803,7 @@
     const LegendEntryRole = 'legend-entry';
     const LegendGradientRole = 'legend-gradient';
     const LegendLabelRole = 'legend-label';
+    const LegendScrollbarRole = 'legend-scrollbar';
     const LegendSymbolRole = 'legend-symbol';
     const LegendTitleRole = 'legend-title';
     const TitleRole = 'title';
@@ -39371,6 +39574,7 @@
     const Bottom = 'bottom';
     const Center = 'center';
     const Vertical = 'vertical';
+    const Auto = 'auto';
     const Start = 'start';
     const Middle = 'middle';
     const End = 'end';
@@ -39411,6 +39615,17 @@
     const one = {
       value: 1
     };
+    function guideMark(mark, extras) {
+      if (extras) {
+        mark.name = extras.name;
+        mark.style = extras.style || mark.style;
+        mark.interactive = !!extras.interactive;
+        mark.encode = extendEncode(mark.encode, extras, Skip);
+      } else {
+        mark.interactive = false;
+      }
+      return mark;
+    }
     const GroupMark = 'group';
     const RectMark = 'rect';
     const RuleMark = 'rule';
@@ -39426,7 +39641,10 @@
       _.isVertical = s => Vertical === value(spec.direction, config.direction || (s ? config.symbolDirection : config.gradientDirection));
       _.gradientLength = () => value(spec.gradientLength, config.gradientLength || config.gradientWidth);
       _.gradientThickness = () => value(spec.gradientThickness, config.gradientThickness || config.gradientHeight);
-      _.entryColumns = () => value(spec.columns, value(config.columns, +_.isVertical(true)));
+      _.entryColumns = () => {
+        const columns = value(spec.columns, value(config.columns, +_.isVertical(true)));
+        return columns === Auto && _.isVertical(true) ? 1 : columns;
+      };
       return _;
     }
     function getEncoding(name, encode) {
@@ -39485,17 +39703,6 @@
       } : Object.assign({}, value, {
         offset: extendOffset(value.offset, offset)
       });
-    }
-    function guideMark(mark, extras) {
-      if (extras) {
-        mark.name = extras.name;
-        mark.style = extras.style || mark.style;
-        mark.interactive = !!extras.interactive;
-        mark.encode = extendEncode(mark.encode, extras, Skip);
-      } else {
-        mark.interactive = false;
-      }
-      return mark;
     }
     function legendGradient(spec, scale, config, userEncode) {
       const _ = lookup(spec, config),
@@ -40511,7 +40718,8 @@
         name = legendEncode.name || undefined,
         interactive = legendEncode.interactive,
         style = legendEncode.style,
-        scales = {};
+        scales = {},
+        scrollable = _('maxHeight') != null;
       let scale = 0,
         entryLayout,
         params,
@@ -40544,6 +40752,10 @@
           }
         }
       };
+      // a scrollable entry group is hit-tested so wheel events can find it
+      if (scrollable) entryEncode.enter.fill = {
+        value: 'transparent'
+      };
 
       // data source for legend values
       const entryRef = ref(scope.add(LegendEntries(params = {
@@ -40573,7 +40785,9 @@
       else {
         // determine legend symbol group layout
         entryLayout = legendSymbolLayout(spec, config);
-        children = [legendSymbolGroups(spec, config, encode, entryRef, deref(entryLayout.columns))];
+        // auto columns are resolved at layout time; encoders only need a non-zero count
+        const columns = entryLayout.columns === Auto ? 1 : deref(entryLayout.columns);
+        children = [legendSymbolGroups(spec, config, encode, entryRef, columns)];
         // pass symbol size information to legend entry generator
         params.size = sizeExpression(spec, scope, children[0].marks);
       }
@@ -40585,12 +40799,35 @@
         encode: entryEncode,
         marks: children,
         layout: entryLayout,
-        interactive
+        interactive: interactive || scrollable
       })];
 
       // include legend title if defined
       if (datum.title) {
         children.push(legendTitle(spec, config, encode.title, dataRef));
+      }
+
+      // scrollbar thumb, positioned by layout
+      if (scrollable && type === Symbols) {
+        children.push(guideMark({
+          type: RectMark,
+          role: LegendScrollbarRole,
+          from: dataRef,
+          encode: {
+            enter: {
+              width: {
+                value: 0
+              },
+              height: {
+                value: 0
+              },
+              fill: encoder(_('scrollbarColor')),
+              cornerRadius: {
+                signal: `(${deref(value(_('scrollbarWidth'), 0))}) / 2`
+              }
+            }
+          }
+        }));
       }
 
       // parse legend specification
@@ -40634,6 +40871,9 @@
         strokeDash: config.strokeDash,
         x: _('legendX'),
         y: _('legendY'),
+        maxWidth: _('maxWidth'),
+        maxHeight: _('maxHeight'),
+        scrollbarWidth: _('scrollbarWidth'),
         // accessibility support
         format: spec.format,
         formatType: spec.formatType
@@ -42221,6 +42461,8 @@
           symbolStrokeWidth: 1.5,
           symbolBaseFillColor: 'transparent',
           symbolBaseStrokeColor: gray,
+          scrollbarColor: gray,
+          scrollbarWidth: 4,
           titleLimit: 180,
           titleOrient: 'top',
           titlePadding: 5,

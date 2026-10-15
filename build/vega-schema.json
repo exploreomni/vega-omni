@@ -5872,7 +5872,62 @@
               "$ref": "#/definitions/numberOrSignal"
             },
             "columns": {
-              "$ref": "#/definitions/numberOrSignal"
+              "oneOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "auto"
+                  ]
+                },
+                {
+                  "$ref": "#/definitions/signalRef"
+                }
+              ]
+            },
+            "maxWidth": {
+              "oneOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "$ref": "#/definitions/numberValue"
+                }
+              ]
+            },
+            "maxHeight": {
+              "oneOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "$ref": "#/definitions/numberValue"
+                }
+              ]
+            },
+            "scrollbarColor": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/colorValue"
+                }
+              ]
+            },
+            "scrollbarWidth": {
+              "oneOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "$ref": "#/definitions/numberValue"
+                }
+              ]
             },
             "columnPadding": {
               "$ref": "#/definitions/numberOrSignal"
