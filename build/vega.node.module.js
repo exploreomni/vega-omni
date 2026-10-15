@@ -17384,7 +17384,30 @@ function lineArray(_) {
   return isArray(_) ? _.length > 1 ? _ : _[0] : _;
 }
 function textLines(item) {
-  return lineArray(item.lineBreak && item.text && !isArray(item.text) ? item.text.split(item.lineBreak) : item.text);
+  const lines = item.lineBreak && item.text && !isArray(item.text) ? item.text.split(item.lineBreak) : item.text;
+  return lineArray(item.wrap && item.limit > 0 ? wrapLines(item, lines) : lines);
+}
+
+// Break each line at spaces so none is wider than the item's limit. A single
+// word wider than the limit keeps its line and is truncated as usual.
+function wrapLines(item, lines) {
+  const width = widthGetter(item),
+    limit = +item.limit;
+  return (isArray(lines) ? lines : [lines]).flatMap(line => {
+    const out = [];
+    let current = '';
+    for (const word of (line == null ? '' : line + '').split(' ')) {
+      const next = current ? current + ' ' + word : word;
+      if (current && width(next) > limit) {
+        out.push(current);
+        current = word;
+      } else {
+        current = next;
+      }
+    }
+    out.push(current);
+    return out;
+  });
 }
 function multiLineOffset(item) {
   const tl = textLines(item);
@@ -20930,11 +20953,12 @@ const LegendRole$2 = 'legend',
 const clamp = (v, max) => Math.max(0, Math.min(max, v || 0));
 
 /**
- * Size a symbol legend's entry group to a height budget. Entries that
- * overflow are clipped and offset by the legend's scroll position. Runs
- * before the title is placed, as the viewport leaves room for the title.
+ * Size a symbol legend's entry group to a height budget, and to a viewport
+ * width when given. Entries that overflow are clipped and offset by the
+ * legend's scroll position. Runs before the title is placed, as the
+ * viewport leaves room for the title.
  */
-function legendScrollLayout(view, item, entry, maxHeight) {
+function legendScrollLayout(view, item, entry, maxHeight, viewWidth) {
   const scope = entry.items[0],
     title = item.datum.title ? item.items[1].items[0] : null,
     stacked = title && title.orient !== Left$1 && title.orient !== Right$1,
@@ -20950,7 +20974,7 @@ function legendScrollLayout(view, item, entry, maxHeight) {
   if (max > 0) legendScrollEvents(view);
   if (max > 0) {
     entry.clip = true;
-    entry.width = Math.ceil(scope.bounds.x2) + 2 * bar;
+    entry.width = Math.max(Math.ceil(scope.bounds.x2) + 2 * bar, viewWidth != null ? viewWidth - 2 * pad : 0);
     entry.height = viewHeight;
     entry.bounds.set(entry.x, entry.y, entry.x + entry.width, entry.y + entry.height);
   } else {
@@ -21069,6 +21093,7 @@ function legendParams(g, orient, config, xb, yb, w, h) {
     align: Each,
     bounds: _('bounds', Flush),
     columns: _('direction') === 'vertical' ? 1 : g.length,
+    span: frame === Bounds ? xb.width() : w || yb.width() + 2 * yb.x1,
     padding: _('margin', 8),
     center: _('center'),
     nodirty: true
@@ -21184,7 +21209,7 @@ function fitColumns(boxes, avail, align, padding) {
   while (ncols > 1 && width(ncols) > avail) --ncols;
   return Math.max(1, ncols);
 }
-function legendLayout(view, legend, maxHeight) {
+function legendLayout(view, legend, maxHeight, viewWidth) {
   var item = legend.items[0],
     datum = item.datum,
     orient = item.orient,
@@ -21202,7 +21227,7 @@ function legendLayout(view, legend, maxHeight) {
 
   // clip entries to maxHeight before the title is placed against them
   if (scroll) {
-    legendScrollLayout(view, item, entry, maxHeight != null ? maxHeight : item.maxHeight);
+    legendScrollLayout(view, item, entry, maxHeight != null ? maxHeight : item.maxHeight, viewWidth);
   }
 
   // adjust legend to accommodate padding and title
@@ -21247,6 +21272,16 @@ function legendColumnLayout(view, legends, margin) {
   shrink(reducible, excess).forEach((dh, i) => {
     if (dh > 0) legendLayout(view, legends[i], items[i].height - dh);
   });
+}
+
+/**
+ * A scrolling legend alone in a top or bottom slot widens its viewport to
+ * the slot, so its scrollbar sits at the slot's edge rather than against
+ * the last column.
+ */
+function legendRowLayout(view, legends, span) {
+  const item = legends[0].items[0];
+  if (legends.length === 1 && item._scrollMax > 0) legendLayout(view, legends[0], null, span);
 }
 function legendBounds(item, b) {
   // aggregate item bounds
@@ -21514,6 +21549,8 @@ function layoutGroup(view, group, _) {
         params = legendParams(g, orient, _.legends, xBounds, yBounds, width, height);
       if (params.columns === 1 && g.length > 1) {
         legendColumnLayout(view, g.map(item => item.mark), params.padding);
+      } else if (orient === Top$1 || orient === Bottom$1) {
+        legendRowLayout(view, g.map(item => item.mark), params.span);
       }
       gridLayout(view, g, params);
     }
@@ -40029,7 +40066,8 @@ function legendSymbolGroups(spec, config, userEncode, dataRef, columns) {
     fontSize: _('labelFontSize'),
     fontStyle: _('labelFontStyle'),
     fontWeight: _('labelFontWeight'),
-    limit: _('labelLimit')
+    limit: _('labelLimit'),
+    wrap: _('labelWrap')
   });
   const labels = guideMark({
     type: TextMark,
@@ -42547,5 +42585,5 @@ function parse(spec, config, options) {
 extend$1(transforms, tx, vtx, encode$1, geo, force, label, tree, reg, voronoi, wordcloud, xf);
 const version = version$1;
 
-export { Bounds$1 as Bounds, CanvasHandler, CanvasRenderer, DATE, DAY, DAYOFYEAR, Dataflow, Debug, DisallowedObjectProperties, Error$1 as Error, EventStream, Gradient$1 as Gradient, GroupItem, HOURS, Handler, HybridHandler, HybridRenderer, ISOWEEK, Info, Item, MILLISECONDS, MINUTES, MONTH, Marks, MultiPulse, None$2 as None, Operator, Parameters, Pulse, QUARTER, RenderType, Renderer, ResourceLoader, SECONDS, SVGHandler, SVGRenderer, SVGStringRenderer, Scenegraph, TIME_UNITS, Transform, View$1 as View, WEEK, Warn, YEAR, accessor, accessorFields, accessorName, array$5 as array, ascending$2 as ascending, estimateBandwidth as bandwidthNRD, bin, bootstrapCI, boundClip, boundContext, boundItem$1 as boundItem, boundMark, boundStroke, changeset, clampRange, codegen as codegenExpression, compare$1 as compare, constant$5 as constant, cumulativeLogNormal, cumulativeNormal, cumulativeUniform, dayofyear, debounce, defaultLocale, definition$1 as definition, densityLogNormal, densityNormal, densityUniform, detectTimeUnits, domChild, domClear, domCreate, domFind, dotbin, error, expressionFunction, extend$1 as extend, extent, extentIndex, falsy, fastmap, field$1 as field, flush, font, fontFamily, fontSize, format$2 as format, numberFormatDefaultLocale as formatLocale, formats$1 as formats, hasOwnProperty, id, identity$7 as identity, inferType, inferTypes, ingest$1 as ingest, inherits, inrange, interpolate, interpolateColors, interpolateRange, intersect$2 as intersect, intersectBoxLine, intersectPath, intersectPoint, intersectRule, isArray, isBoolean$1 as isBoolean, isDate$1 as isDate, isFunction, isIterable, isNumber$1 as isNumber, isObject, isRegExp, isString, isTuple, isoweek, key, lerp, lineHeight, loader, locale, logger, lruCache, markup, merge$3 as merge, mergeConfig, multiLineOffset, one$2 as one, pad$2 as pad, panLinear, panLog, panPow, panSymlog, parse, parser$1 as parseExpression, eventSelector as parseSelector, path$3 as path, curves as pathCurves, pathEqual, parse$3 as pathParse, vg_rect as pathRectangle, pathRender, symbols as pathSymbols, vg_trail as pathTrail, peek$1 as peek, point, projection, quantileLogNormal, quantileNormal, quantileUniform, quantiles, quantizeInterpolator, quarter, quartiles, random, integer as randomInteger, kde as randomKDE, lcg$2 as randomLCG, lognormal as randomLogNormal, mixture$1 as randomMixture, gaussian as randomNormal, uniform as randomUniform, read, constant$4 as regressionConstant, exp$1 as regressionExp, linear$3 as regressionLinear, loess as regressionLoess, log$3 as regressionLog, poly as regressionPoly, pow$3 as regressionPow, quad as regressionQuad, renderModule, repeat, resetDefaultLocale, resetSVGDefIds, responseType, context as runtimeContext, sampleCurve, sampleLogNormal, sampleNormal, sampleUniform, scale$4 as scale, sceneEqual, sceneFromJSON, pickVisit as scenePickVisit, sceneToJSON, visit as sceneVisit, zorder as sceneZOrder, scheme, serializeXML, setHybridRendererOptions, setRandom, span, splitAccessPath, stringValue, textMetrics, bin$1 as timeBin, timeFloor, timeFormatDefaultLocale as timeFormatLocale, timeInterval, timeOffset, timeSequence, timeUnitSpecifier, timeUnits, toBoolean, toDate, toNumber, toSet, toString, transform$2 as transform, transforms, truncate$1 as truncate, truthy, tupleid, typeParsers, utcFloor, utcInterval, utcOffset, utcSequence, utcdayofyear, utcisoweek, utcquarter, utcweek, version, visitArray, week, writeConfig, zero$3 as zero, zoomLinear, zoomLog, zoomPow, zoomSymlog };
+export { Bounds$1 as Bounds, CanvasHandler, CanvasRenderer, DATE, DAY, DAYOFYEAR, Dataflow, Debug, DisallowedObjectProperties, Error$1 as Error, EventStream, Gradient$1 as Gradient, GroupItem, HOURS, Handler, HybridHandler, HybridRenderer, ISOWEEK, Info, Item, MILLISECONDS, MINUTES, MONTH, Marks, MultiPulse, None$2 as None, Operator, Parameters, Pulse, QUARTER, RenderType, Renderer, ResourceLoader, SECONDS, SVGHandler, SVGRenderer, SVGStringRenderer, Scenegraph, TIME_UNITS, Transform, View$1 as View, WEEK, Warn, YEAR, accessor, accessorFields, accessorName, array$5 as array, ascending$2 as ascending, estimateBandwidth as bandwidthNRD, bin, bootstrapCI, boundClip, boundContext, boundItem$1 as boundItem, boundMark, boundStroke, changeset, clampRange, codegen as codegenExpression, compare$1 as compare, constant$5 as constant, cumulativeLogNormal, cumulativeNormal, cumulativeUniform, dayofyear, debounce, defaultLocale, definition$1 as definition, densityLogNormal, densityNormal, densityUniform, detectTimeUnits, domChild, domClear, domCreate, domFind, dotbin, error, expressionFunction, extend$1 as extend, extent, extentIndex, falsy, fastmap, field$1 as field, flush, font, fontFamily, fontSize, format$2 as format, numberFormatDefaultLocale as formatLocale, formats$1 as formats, hasOwnProperty, id, identity$7 as identity, inferType, inferTypes, ingest$1 as ingest, inherits, inrange, interpolate, interpolateColors, interpolateRange, intersect$2 as intersect, intersectBoxLine, intersectPath, intersectPoint, intersectRule, isArray, isBoolean$1 as isBoolean, isDate$1 as isDate, isFunction, isIterable, isNumber$1 as isNumber, isObject, isRegExp, isString, isTuple, isoweek, key, lerp, lineHeight, loader, locale, logger, lruCache, markup, merge$3 as merge, mergeConfig, multiLineOffset, one$2 as one, pad$2 as pad, panLinear, panLog, panPow, panSymlog, parse, parser$1 as parseExpression, eventSelector as parseSelector, path$3 as path, curves as pathCurves, pathEqual, parse$3 as pathParse, vg_rect as pathRectangle, pathRender, symbols as pathSymbols, vg_trail as pathTrail, peek$1 as peek, point, projection, quantileLogNormal, quantileNormal, quantileUniform, quantiles, quantizeInterpolator, quarter, quartiles, random, integer as randomInteger, kde as randomKDE, lcg$2 as randomLCG, lognormal as randomLogNormal, mixture$1 as randomMixture, gaussian as randomNormal, uniform as randomUniform, read, constant$4 as regressionConstant, exp$1 as regressionExp, linear$3 as regressionLinear, loess as regressionLoess, log$3 as regressionLog, poly as regressionPoly, pow$3 as regressionPow, quad as regressionQuad, renderModule, repeat, resetDefaultLocale, resetSVGDefIds, responseType, context as runtimeContext, sampleCurve, sampleLogNormal, sampleNormal, sampleUniform, scale$4 as scale, sceneEqual, sceneFromJSON, pickVisit as scenePickVisit, sceneToJSON, visit as sceneVisit, zorder as sceneZOrder, scheme, serializeXML, setHybridRendererOptions, setRandom, span, splitAccessPath, stringValue, textLines, textMetrics, bin$1 as timeBin, timeFloor, timeFormatDefaultLocale as timeFormatLocale, timeInterval, timeOffset, timeSequence, timeUnitSpecifier, timeUnits, toBoolean, toDate, toNumber, toSet, toString, transform$2 as transform, transforms, truncate$1 as truncate, truthy, tupleid, typeParsers, utcFloor, utcInterval, utcOffset, utcSequence, utcdayofyear, utcisoweek, utcquarter, utcweek, version, visitArray, week, writeConfig, zero$3 as zero, zoomLinear, zoomLog, zoomPow, zoomSymlog };
 //# sourceMappingURL=vega.node.module.js.map

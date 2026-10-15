@@ -1967,6 +1967,9 @@
         "lineHeight": {
           "$ref": "#/definitions/numberValue"
         },
+        "wrap": {
+          "$ref": "#/definitions/booleanValue"
+        },
         "dx": {
           "$ref": "#/definitions/numberValue"
         },
@@ -6233,6 +6236,16 @@
                 },
                 {
                   "$ref": "#/definitions/numberValue"
+                }
+              ]
+            },
+            "labelWrap": {
+              "oneOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "$ref": "#/definitions/booleanValue"
                 }
               ]
             },

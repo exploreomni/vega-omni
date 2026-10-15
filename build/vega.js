@@ -17349,7 +17349,30 @@
       return isArray(_) ? _.length > 1 ? _ : _[0] : _;
     }
     function textLines(item) {
-      return lineArray(item.lineBreak && item.text && !isArray(item.text) ? item.text.split(item.lineBreak) : item.text);
+      const lines = item.lineBreak && item.text && !isArray(item.text) ? item.text.split(item.lineBreak) : item.text;
+      return lineArray(item.wrap && item.limit > 0 ? wrapLines(item, lines) : lines);
+    }
+
+    // Break each line at spaces so none is wider than the item's limit. A single
+    // word wider than the limit keeps its line and is truncated as usual.
+    function wrapLines(item, lines) {
+      const width = widthGetter(item),
+        limit = +item.limit;
+      return (isArray(lines) ? lines : [lines]).flatMap(line => {
+        const out = [];
+        let current = '';
+        for (const word of (line == null ? '' : line + '').split(' ')) {
+          const next = current ? current + ' ' + word : word;
+          if (current && width(next) > limit) {
+            out.push(current);
+            current = word;
+          } else {
+            current = next;
+          }
+        }
+        out.push(current);
+        return out;
+      });
     }
     function multiLineOffset(item) {
       const tl = textLines(item);
@@ -20895,11 +20918,12 @@
     const clamp = (v, max) => Math.max(0, Math.min(max, v || 0));
 
     /**
-     * Size a symbol legend's entry group to a height budget. Entries that
-     * overflow are clipped and offset by the legend's scroll position. Runs
-     * before the title is placed, as the viewport leaves room for the title.
+     * Size a symbol legend's entry group to a height budget, and to a viewport
+     * width when given. Entries that overflow are clipped and offset by the
+     * legend's scroll position. Runs before the title is placed, as the
+     * viewport leaves room for the title.
      */
-    function legendScrollLayout(view, item, entry, maxHeight) {
+    function legendScrollLayout(view, item, entry, maxHeight, viewWidth) {
       const scope = entry.items[0],
         title = item.datum.title ? item.items[1].items[0] : null,
         stacked = title && title.orient !== Left$1 && title.orient !== Right$1,
@@ -20915,7 +20939,7 @@
       if (max > 0) legendScrollEvents(view);
       if (max > 0) {
         entry.clip = true;
-        entry.width = Math.ceil(scope.bounds.x2) + 2 * bar;
+        entry.width = Math.max(Math.ceil(scope.bounds.x2) + 2 * bar, viewWidth != null ? viewWidth - 2 * pad : 0);
         entry.height = viewHeight;
         entry.bounds.set(entry.x, entry.y, entry.x + entry.width, entry.y + entry.height);
       } else {
@@ -21034,6 +21058,7 @@
         align: Each,
         bounds: _('bounds', Flush),
         columns: _('direction') === 'vertical' ? 1 : g.length,
+        span: frame === Bounds ? xb.width() : w || yb.width() + 2 * yb.x1,
         padding: _('margin', 8),
         center: _('center'),
         nodirty: true
@@ -21149,7 +21174,7 @@
       while (ncols > 1 && width(ncols) > avail) --ncols;
       return Math.max(1, ncols);
     }
-    function legendLayout(view, legend, maxHeight) {
+    function legendLayout(view, legend, maxHeight, viewWidth) {
       var item = legend.items[0],
         datum = item.datum,
         orient = item.orient,
@@ -21167,7 +21192,7 @@
 
       // clip entries to maxHeight before the title is placed against them
       if (scroll) {
-        legendScrollLayout(view, item, entry, maxHeight != null ? maxHeight : item.maxHeight);
+        legendScrollLayout(view, item, entry, maxHeight != null ? maxHeight : item.maxHeight, viewWidth);
       }
 
       // adjust legend to accommodate padding and title
@@ -21212,6 +21237,16 @@
       shrink(reducible, excess).forEach((dh, i) => {
         if (dh > 0) legendLayout(view, legends[i], items[i].height - dh);
       });
+    }
+
+    /**
+     * A scrolling legend alone in a top or bottom slot widens its viewport to
+     * the slot, so its scrollbar sits at the slot's edge rather than against
+     * the last column.
+     */
+    function legendRowLayout(view, legends, span) {
+      const item = legends[0].items[0];
+      if (legends.length === 1 && item._scrollMax > 0) legendLayout(view, legends[0], null, span);
     }
     function legendBounds(item, b) {
       // aggregate item bounds
@@ -21479,6 +21514,8 @@
             params = legendParams(g, orient, _.legends, xBounds, yBounds, width, height);
           if (params.columns === 1 && g.length > 1) {
             legendColumnLayout(view, g.map(item => item.mark), params.padding);
+          } else if (orient === Top$1 || orient === Bottom$1) {
+            legendRowLayout(view, g.map(item => item.mark), params.span);
           }
           gridLayout(view, g, params);
         }
@@ -39994,7 +40031,8 @@
         fontSize: _('labelFontSize'),
         fontStyle: _('labelFontStyle'),
         fontWeight: _('labelFontWeight'),
-        limit: _('labelLimit')
+        limit: _('labelLimit'),
+        wrap: _('labelWrap')
       });
       const labels = guideMark({
         type: TextMark,
@@ -42710,6 +42748,7 @@
     exports.span = span;
     exports.splitAccessPath = splitAccessPath;
     exports.stringValue = stringValue;
+    exports.textLines = textLines;
     exports.textMetrics = textMetrics;
     exports.timeBin = bin$1;
     exports.timeFloor = timeFloor;
