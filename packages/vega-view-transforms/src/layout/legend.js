@@ -120,7 +120,8 @@ export function fitColumns(boxes, avail, align, padding) {
   const n = boxes.length,
         widths = boxes.map(b => Math.ceil(b.x2)),
         insets = boxes.map(b => b.x1 < 0 ? Math.ceil(-b.x1) : 0),
-        wmax = Math.max(0, ...widths);
+        wmin = widths.reduce((a, b) => Math.min(a, b), Infinity),
+        wmax = widths.reduce((a, b) => Math.max(a, b), 0);
 
   // total width of an n-entry grid with ncols columns
   const width = ncols => {
@@ -135,7 +136,9 @@ export function fitColumns(boxes, avail, align, padding) {
     return w;
   };
 
-  let ncols = n;
+  // no wider grid fits even if every column were as narrow as the narrowest entry
+  const most = Math.floor((avail + padding) / (wmin + padding));
+  let ncols = most < n ? Math.max(1, most) : n;
   while (ncols > 1 && width(ncols) > avail) --ncols;
   return Math.max(1, ncols);
 }

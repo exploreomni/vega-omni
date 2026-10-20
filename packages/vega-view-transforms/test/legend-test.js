@@ -22,6 +22,11 @@ tape('fitColumns picks the most columns whose grid fits', t => {
   t.equal(fitColumns(boxes, 170, 'all', 10), 3);
   t.equal(fitColumns(boxes, 169, 'all', 10), 2);
 
+  // many entries: exactly 15 columns of 10 fit 15*10 + 14*10 = 290
+  const many = Array.from({length: 1000}, () => box(0, 10));
+  t.equal(fitColumns(many, 290, 'each', 10), 15);
+  t.equal(fitColumns(many, 289, 'each', 10), 14);
+
   // an entry extending left of its origin widens the gap before its column
   const inset = [box(0, 50), box(-5, 30), box(0, 40)];
   t.equal(fitColumns(inset, 50 + 15 + 30 + 10 + 40, 'each', 10), 3);
