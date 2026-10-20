@@ -22,6 +22,8 @@ export function legendScrollLayout(view, item, entry, maxHeight, viewWidth) {
         stacked = title && title.orient !== Left && title.orient !== Right,
         pad = item.padding || 0,
         bar = item.scrollbarWidth || 0,
+        // a left or right title sits beside the viewport
+        beside = title && !stacked ? Math.ceil(title.bounds.width()) + (item.titlePadding || 0) : 0,
         room = Math.floor(maxHeight - 2 * pad
           - (stacked ? title.bounds.height() + (item.titlePadding || 0) : 0)),
         row = scope.items.length ? Math.ceil(scope.items[0].bounds.height()) : 0,
@@ -46,7 +48,9 @@ export function legendScrollLayout(view, item, entry, maxHeight, viewWidth) {
     entry.clip = true;
     entry.width = Math.max(
       Math.ceil(scope.bounds.x2) + 2 * bar,
-      viewWidth != null ? viewWidth - 2 * pad : 0
+      viewWidth != null
+        ? Math.min(viewWidth, item.maxWidth != null ? item.maxWidth : Infinity) - 2 * pad - beside
+        : 0
     );
     entry.height = viewHeight;
     entry.bounds.set(entry.x, entry.y, entry.x + entry.width, entry.y + entry.height);

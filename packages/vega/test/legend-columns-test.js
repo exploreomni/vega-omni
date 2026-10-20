@@ -4,7 +4,7 @@ import * as vega from '../index.js';
 vega.textMetrics.canvas(false);
 
 // a bottom legend of 40 entries whose columns fit maxWidth
-function spec(autosize, maxWidth, signals = []) {
+function spec(autosize, legend, signals = []) {
   return {
     width: 500,
     height: 100,
@@ -22,7 +22,7 @@ function spec(autosize, maxWidth, signals = []) {
     }],
     legends: [{
       fill: 'color', orient: 'bottom', direction: 'horizontal',
-      columns: 'auto', symbolLimit: 0, maxWidth
+      columns: 'auto', symbolLimit: 0, ...legend
     }]
   };
 }
@@ -34,7 +34,7 @@ function legendWidth(view) {
 
 tape('Auto columns re-fit when a maxWidth signal changes', async t => {
   const view = new vega.View(
-    vega.parse(spec('pad', {signal: 'mw'}, [{name: 'mw', value: 400}])),
+    vega.parse(spec('pad', {maxWidth: {signal: 'mw'}}, [{name: 'mw', value: 400}])),
     {renderer: 'none'}
   );
   await view.runAsync();
@@ -47,7 +47,7 @@ tape('Auto columns re-fit when a maxWidth signal changes', async t => {
 
 tape('Auto columns re-fit when maxWidth follows a fit width', async t => {
   const view = new vega.View(
-    vega.parse(spec({type: 'fit', contains: 'padding'}, {signal: 'width'})),
+    vega.parse(spec({type: 'fit', contains: 'padding'}, {maxWidth: {signal: 'width'}})),
     {renderer: 'none'}
   );
   await view.runAsync();
@@ -55,5 +55,19 @@ tape('Auto columns re-fit when maxWidth follows a fit width', async t => {
 
   await view.width(300).runAsync();
   t.ok(legendWidth(view) <= view.width(), `${legendWidth(view)} fits ${view.width()}`);
+  t.end();
+});
+
+tape('A scrolling bottom legend spans its slot within maxWidth', async t => {
+  // auto columns cannot leave room for a left title, which is measured after
+  // the entries are laid out, so that case sets its columns
+  for (const legend of [{titleOrient: 'top'}, {titleOrient: 'left', columns: 2}]) {
+    const view = new vega.View(
+      vega.parse(spec('pad', {maxWidth: 200, maxHeight: 40, title: 'Entries', ...legend})),
+      {renderer: 'none'}
+    );
+    await view.runAsync();
+    t.ok(legendWidth(view) <= 200, `${legend.titleOrient} title: ${legendWidth(view)} fits 200`);
+  }
   t.end();
 });
