@@ -32,8 +32,7 @@ export default function(spec, scope) {
         name = legendEncode.name || undefined,
         interactive = legendEncode.interactive,
         style = legendEncode.style,
-        scales = {},
-        scrollable = _('maxHeight') != null;
+        scales = {};
 
   let scale = 0, entryLayout, params, children;
 
@@ -44,7 +43,8 @@ export default function(spec, scope) {
   if (!scale) error('Missing valid scale for legend.');
 
   // resolve legend type (symbol, gradient, or discrete gradient)
-  const type = legendType(spec, scope.scaleType(scale));
+  const type = legendType(spec, scope.scaleType(scale)),
+        scrollable = type === Symbols && _('maxHeight') != null;
 
   // single-element data source for legend group
   const datum = {
@@ -127,7 +127,7 @@ export default function(spec, scope) {
   }
 
   // scroll fade and scrollbar thumb; layout sizes and places both
-  if (scrollable && type === Symbols) {
+  if (scrollable) {
     const fade = _('scrollFadeColor');
     if (fade != null) {
       const color = isObject(fade)

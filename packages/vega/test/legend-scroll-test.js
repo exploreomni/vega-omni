@@ -79,3 +79,18 @@ tape('Scroll colors and width follow their signals', async t => {
   t.equal(thumb.cornerRadius, 4);
   t.end();
 });
+
+tape('A gradient legend with maxHeight leaves its entries alone', async t => {
+  const view = new vega.View(vega.parse({
+    width: 200,
+    height: 150,
+    scales: [{name: 'color', type: 'linear', domain: [0, 100], range: {scheme: 'blues'}}],
+    legends: [{fill: 'color', orient: 'right', maxHeight: 100}]
+  }), {renderer: 'none'});
+  await view.runAsync();
+
+  const entry = part(view, 'legend-entry');
+  t.equal(entry.mark.interactive, false);
+  t.equal(entry.fill, undefined);
+  t.end();
+});
