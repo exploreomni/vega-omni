@@ -10,6 +10,7 @@ let NodeCanvas;
 if (typeof require !== 'undefined') {
   // CommonJS environment — `require` is already in scope.
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     NodeCanvas = require('canvas');
     if (!(NodeCanvas && NodeCanvas.createCanvas)) {
       NodeCanvas = null;
