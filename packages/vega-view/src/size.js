@@ -1,7 +1,12 @@
 var Width = 'width',
     Height = 'height',
     Padding = 'padding',
-    Skip = {skip: true};
+    Skip = {skip: true},
+    // bounds the re-fits one autosize makes when the layout at the size it
+    // chose asks for another: a legend wrapping to one more row at the
+    // narrower width needs one, and the bound keeps two layouts that
+    // disagree from trading sizes forever
+    MaxAutosizePasses = 3;
 
 export function viewWidth(view, width) {
   var a = view.autosize(),
@@ -93,8 +98,15 @@ export function resizeView(viewWidth, viewHeight, width, height, origin, auto) {
       view._origin = origin;
     }
 
-    // run dataflow on width/height signal change
-    if (rerun) view.run('enter');
+    // run dataflow on width/height signal change, fitting again if the
+    // layout at the new size asks for another
+    if (rerun) {
+      view._autosizePass = (view._autosizePass || 0) + 1;
+      if (view._autosizePass < MaxAutosizePasses) view._autosize = 1;
+      view.run('enter');
+    } else {
+      view._autosizePass = 0;
+    }
     if (auto) view.runAfter(v => v.resize());
   }, false, 1);
 }
