@@ -205,7 +205,7 @@ tape('wheel events scroll the legend under the pointer', t => {
         view = {
           dirty() {},
           runAsync() { runs.push(1); },
-          addEventListener(type, handler) { listeners[type] = handler; }
+          addEventListener(type, handler) { (listeners[type] = listeners[type] || []).push(handler); }
         },
         {item, entry, entries, thumb} = legend(10, {maxHeight: 50});
 
@@ -219,11 +219,12 @@ tape('wheel events scroll the legend under the pointer', t => {
 
   legendScrollLayout(view, item, entry, item.maxHeight);
   legendScrollLayout(view, item, entry, item.maxHeight);
-  t.equal(Object.keys(listeners).join(), 'wheel', 'registered once');
+  t.deepEqual(Object.keys(listeners), ['wheel']);
+  t.equal(listeners.wheel.length, 1, 'registered once');
 
   const wheel = (deltaY, deltaMode = 0) => {
     const evt = {deltaY, deltaMode, prevented: false, preventDefault() { this.prevented = true; }};
-    listeners.wheel(evt, symbol);
+    listeners.wheel[0](evt, symbol);
     return evt.prevented;
   };
 
@@ -246,8 +247,8 @@ tape('wheel events scroll the legend under the pointer', t => {
 
   // a wheel outside any legend is ignored
   const evt = {deltaY: 10, prevented: false, preventDefault() { this.prevented = true; }};
-  listeners.wheel(evt, {mark: {role: 'mark', group: null}});
-  listeners.wheel(evt, null);
+  listeners.wheel[0](evt, {mark: {role: 'mark', group: null}});
+  listeners.wheel[0](evt, null);
   t.equal(evt.prevented, false);
   t.end();
 });

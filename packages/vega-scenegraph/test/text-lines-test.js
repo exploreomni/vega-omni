@@ -1,9 +1,9 @@
 import tape from 'tape';
-import {textLines, textMetrics} from '../index.js';
+import './__init__.js';
+import {textLines} from '../index.js';
 import {textValue} from '../src/util/text.js';
 
-// estimated widths: 0.8 * characters * font size
-textMetrics.canvas(false);
+// __init__ sets estimated widths: 0.8 * characters * font size
 
 tape('textLines wraps text at spaces to fit the limit', t => {
   const item = {text: 'alpha beta gamma delta', fontSize: 10, wrap: true};
