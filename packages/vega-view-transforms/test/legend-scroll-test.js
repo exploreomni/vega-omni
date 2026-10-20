@@ -91,6 +91,11 @@ tape('legendScrollLayout leaves room for a stacked title', t => {
   legendScrollLayout(view, item, entry, item.maxHeight);
   t.equal(entry.height, 50 - 4 - 11 - 5);
 
+  // a budget the title and padding use up still clips, keeping one entry in view
+  legendScrollLayout(view, item, entry, 18);
+  t.equal(entry.clip, true);
+  t.equal(entry.height, 10);
+
   title.orient = 'left';
   legendScrollLayout(view, item, entry, item.maxHeight);
   t.equal(entry.height, 50 - 4);

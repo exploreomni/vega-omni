@@ -22,10 +22,13 @@ export function legendScrollLayout(view, item, entry, maxHeight, viewWidth) {
         stacked = title && title.orient !== Left && title.orient !== Right,
         pad = item.padding || 0,
         bar = item.scrollbarWidth || 0,
-        viewHeight = Math.floor(maxHeight - 2 * pad
+        room = Math.floor(maxHeight - 2 * pad
           - (stacked ? title.bounds.height() + (item.titlePadding || 0) : 0)),
+        row = scope.items.length ? Math.ceil(scope.items[0].bounds.height()) : 0,
+        // a budget keeps at least one entry in view; none at all (an unsized
+        // container) draws the legend unclipped
+        viewHeight = maxHeight > 0 ? Math.max(room, row) : room,
         contentHeight = Math.ceil(scope.bounds.y2 + (entry._scrollY || 0)),
-        // no room at all (an unsized container) draws the legend unclipped
         max = viewHeight > 0 ? contentHeight - viewHeight : 0;
 
   item._scrollMax = Math.max(0, max);
