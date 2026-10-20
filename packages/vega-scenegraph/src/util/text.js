@@ -63,8 +63,8 @@ export function textLines(item) {
   return lineArray(item.wrap && item.limit > 0 ? wrapLines(item, lines) : lines);
 }
 
-// Break each line at spaces so none exceeds the item's limit. A word wider
-// than the limit gets its own line and is truncated as usual.
+// Break each line at spaces so every line fits under the item's limit, as
+// truncate() requires. A word too wide gets its own line and is truncated.
 function wrapLines(item, lines) {
   const width = widthGetter(item),
         limit = +item.limit;
@@ -73,7 +73,7 @@ function wrapLines(item, lines) {
     let current = '';
     for (const word of (line == null ? '' : line + '').split(' ')) {
       const next = current ? current + ' ' + word : word;
-      if (current && width(next) > limit) {
+      if (current && width(next) >= limit) {
         out.push(current);
         current = word;
       } else {
