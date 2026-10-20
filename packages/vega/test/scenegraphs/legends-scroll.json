@@ -1698,6 +1698,25 @@
                 },
                 {
                   "marktype": "rect",
+                  "role": "legend-scroll-fade",
+                  "interactive": false,
+                  "clip": false,
+                  "items": [
+                    {
+                      "x": 0,
+                      "y": 76,
+                      "width": 40,
+                      "height": 24,
+                      "fill": {
+                        "x2": 0,
+                        "y2": 1
+                      }
+                    }
+                  ],
+                  "zindex": 0
+                },
+                {
+                  "marktype": "rect",
                   "role": "legend-scrollbar",
                   "interactive": false,
                   "clip": false,

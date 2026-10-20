@@ -335,6 +335,11 @@ export interface BaseLegend {
   scrollbarColor?: ColorValue;
 
   /**
+   * The color a symbol legend's last visible entries fade into while more can be scrolled, usually the background behind the legend. Unset draws no fade.
+   */
+  scrollFadeColor?: ColorValue;
+
+  /**
    * The width in pixels of the scrollbar thumb drawn when a symbol legend overflows `maxHeight`.
    *
    * __Default value:__ `4`.

@@ -13,14 +13,16 @@ import legendGradientLabels from './guides/legend-gradient-labels.js';
 import legendSymbolGroups, {legendSymbolLayout} from './guides/legend-symbol-groups.js';
 import legendTitle from './guides/legend-title.js';
 import parseMark from './mark.js';
-import {LegendEntryRole, LegendRole, LegendScrollbarRole} from './marks/roles.js';
+import {
+  LegendEntryRole, LegendRole, LegendScrollFadeRole, LegendScrollbarRole
+} from './marks/roles.js';
 
 import {deref, ref, value} from '../util.js';
 import {Collect, LegendEntries} from '../transforms.js';
 
 import {parseExpression} from 'vega-functions';
 import {isContinuous, isDiscretizing} from 'vega-scale';
-import {error} from 'vega-util';
+import {error, isObject, stringValue} from 'vega-util';
 
 export default function(spec, scope) {
   const config = scope.config.legend,
@@ -120,8 +122,29 @@ export default function(spec, scope) {
     children.push(legendTitle(spec, config, encode.title, dataRef));
   }
 
-  // scrollbar thumb, positioned by layout
+  // scroll fade and scrollbar thumb; layout sizes and places both
   if (scrollable && type === Symbols) {
+    const fade = _('scrollFadeColor');
+    if (fade != null) {
+      const color = isObject(fade) && fade.signal ? fade.signal : stringValue(fade);
+      // the first stop is the fade color at zero alpha, not 'transparent':
+      // a renderer that interpolates unpremultiplied blends black into it
+      const clear = `'rgba(' + rgb(${color}).r + ',' + rgb(${color}).g + ',' + rgb(${color}).b + ',0)'`;
+      children.push(guideMark({
+        type: RectMark,
+        role: LegendScrollFadeRole,
+        from: dataRef,
+        encode: {
+          enter: {
+            width: {value: 0},
+            height: {value: 0},
+            fill: {
+              signal: `{gradient: 'linear', x1: 0, y1: 0, x2: 0, y2: 1, stops: [{offset: 0, color: ${clear}}, {offset: 1, color: ${color}}]}`
+            }
+          }
+        }
+      }));
+    }
     children.push(guideMark({
       type: RectMark,
       role: LegendScrollbarRole,

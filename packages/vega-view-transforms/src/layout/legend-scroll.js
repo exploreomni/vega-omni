@@ -3,8 +3,10 @@ import {Marks} from 'vega-scenegraph';
 
 const LegendRole = 'legend',
       ScrollbarRole = 'legend-scrollbar',
+      ScrollFadeRole = 'legend-scroll-fade',
       WheelEvent = 'wheel',
-      LineHeight = 16;
+      LineHeight = 16,
+      FadeHeight = 24;
 
 const clamp = (v, max) => Math.max(0, Math.min(max, v || 0));
 
@@ -102,24 +104,49 @@ function wheelDelta(evt, viewHeight) {
 }
 
 /**
- * Place the scrollbar thumb along the right edge of the entry viewport.
+ * Place the scrollbar thumb along the right edge of the entry viewport, and
+ * the fade over the viewport's last rows while more can be scrolled.
  */
 export function legendScrollbarLayout(view, item, entry) {
-  const mark = item.items.find(m => m.role === ScrollbarRole),
-        thumb = mark && mark.items[0];
-  if (!thumb) return;
-
   const max = item._scrollMax,
         viewHeight = item._scrollView,
         w = item.scrollbarWidth || 0,
-        h = max > 0 ? Math.max(2 * w, Math.round(viewHeight * viewHeight / (viewHeight + max))) : 0;
+        h = max > 0 ? Math.max(2 * w, Math.round(viewHeight * viewHeight / (viewHeight + max))) : 0,
+        thumb = legendPart(item, ScrollbarRole),
+        fade = legendPart(item, ScrollFadeRole);
 
-  view.dirty(thumb);
-  thumb.width = max > 0 ? w : 0;
-  thumb.height = h;
-  thumb.x = entry.x + entry.width - thumb.width;
-  thumb.y = entry.y + (max > 0 ? Math.round((viewHeight - h) * item._scroll / max) : 0);
-  Marks.rect.bound(thumb.bounds.clear(), thumb);
-  mark.bounds.clear().union(thumb.bounds);
-  view.dirty(thumb);
+  if (thumb) {
+    placeRect(view, thumb, {
+      x: entry.x + entry.width - (max > 0 ? w : 0),
+      y: entry.y + (max > 0 ? Math.round((viewHeight - h) * item._scroll / max) : 0),
+      width: max > 0 ? w : 0,
+      height: h
+    });
+  }
+  if (fade) {
+    const fh = max > 0 && item._scroll < max ? Math.min(FadeHeight, viewHeight) : 0;
+    // an empty rect still has bounds, so it stays inside the entries
+    placeRect(view, fade, {
+      x: entry.x,
+      y: entry.y + (fh ? viewHeight - fh : 0),
+      width: fh ? entry.width : 0,
+      height: fh
+    });
+  }
+}
+
+function legendPart(item, role) {
+  const mark = item.items.find(m => m.role === role);
+  return mark && mark.items[0];
+}
+
+function placeRect(view, rect, {x, y, width, height}) {
+  view.dirty(rect);
+  rect.x = x;
+  rect.y = y;
+  rect.width = width;
+  rect.height = height;
+  Marks.rect.bound(rect.bounds.clear(), rect);
+  rect.mark.bounds.clear().union(rect.bounds);
+  view.dirty(rect);
 }

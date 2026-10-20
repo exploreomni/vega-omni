@@ -13,15 +13,19 @@ function legend(n, props) {
           bounds: new Bounds().set(0, 0, 60, 13 * (n - 1) + 10)},
         entry = {x: 0, y: 0, items: [scope], bounds: new Bounds(), _scrollY: 0},
         thumb = {bounds: new Bounds()},
+        fade = {bounds: new Bounds()},
         item = {
           datum: {title: false, type: 'symbol'},
           padding: 0, scrollbarWidth: 4,
           items: [{items: [entry], bounds: new Bounds()},
+                  {role: 'legend-scroll-fade', items: [fade], bounds: new Bounds()},
                   {role: 'legend-scrollbar', items: [thumb], bounds: new Bounds()}],
           ...props
         };
   entry.mark = item.items[0];
-  return {item, entry, entries, thumb};
+  fade.mark = item.items[1];
+  thumb.mark = item.items[2];
+  return {item, entry, entries, fade, thumb};
 }
 
 tape('legendScrollLayout clips entries that overflow maxHeight', t => {
@@ -117,6 +121,34 @@ tape('legendScrollbarLayout sizes the thumb to the visible fraction', t => {
   legendScrollLayout(view, item, entry);
   legendScrollbarLayout(view, item, entry);
   t.equal(thumb.width, 0, 'hidden when nothing overflows');
+  t.end();
+});
+
+tape('legendScrollbarLayout fades the last rows while more can be scrolled', t => {
+  const {item, entry, fade} = legend(10, {maxHeight: 50});
+  entry.x = 3; entry.y = 7;
+  legendScrollLayout(view, item, entry, item.maxHeight);
+  legendScrollbarLayout(view, item, entry);
+  t.deepEqual([fade.x, fade.y, fade.width, fade.height], [3, 7 + 50 - 24, 68, 24]);
+
+  item._scroll = 77;
+  legendScrollLayout(view, item, entry, item.maxHeight);
+  legendScrollbarLayout(view, item, entry);
+  t.equal(fade.height, 0, 'no fade at the end');
+
+  item.maxHeight = 30;
+  item._scroll = 0;
+  legendScrollLayout(view, item, entry, item.maxHeight);
+  legendScrollbarLayout(view, item, entry);
+  t.equal(fade.height, 24, 'capped by the viewport');
+
+  // a legend that fits keeps the empty fade inside its entries, where it
+  // adds nothing to the legend's bounds
+  item.maxHeight = 200;
+  legendScrollLayout(view, item, entry, item.maxHeight);
+  legendScrollbarLayout(view, item, entry);
+  t.deepEqual([fade.y, fade.width, fade.height], [7, 0, 0]);
+  t.equal(fade.bounds.y2, 7);
   t.end();
 });
 
