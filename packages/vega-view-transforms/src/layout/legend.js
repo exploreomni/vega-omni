@@ -4,7 +4,9 @@ import {
   TopLeft, TopRight
 } from '../constants.js';
 import {bboxFull, get, gridLayoutGroups} from './grid.js';
-import {legendScrollLayout, legendScrollbarLayout} from './legend-scroll.js';
+import {
+  MinViewHeight, legendScrollLayout, legendScrollbarLayout, shrink
+} from './legend-scroll.js';
 import {boundStroke, multiLineOffset} from 'vega-scenegraph';
 
 // utility for looking up legend layout configuration
@@ -137,7 +139,7 @@ export function fitColumns(boxes, avail, align, padding) {
   return Math.max(1, ncols);
 }
 
-export function legendLayout(view, legend) {
+export function legendLayout(view, legend, maxHeight) {
   var item = legend.items[0],
       datum = item.datum,
       orient = item.orient,
@@ -154,7 +156,9 @@ export function legendLayout(view, legend) {
         scroll = datum.type === Symbols && item.maxHeight != null;
 
   // clip entries to maxHeight before the title is placed against them
-  if (scroll) legendScrollLayout(view, item, entry);
+  if (scroll) {
+    legendScrollLayout(view, item, entry, maxHeight != null ? maxHeight : item.maxHeight);
+  }
 
   // adjust legend to accommodate padding and title
   legendGroupLayout(view, item, entry);
@@ -184,6 +188,28 @@ export function legendLayout(view, legend) {
   item.mark.bounds.clear().union(bounds);
 
   return item;
+}
+
+/**
+ * Fit the legends stacked in one orient column within the largest maxHeight
+ * among them. Legends without a maxHeight keep their height; scrollable ones
+ * give up viewport in proportion, down to MinViewHeight, and are laid out
+ * again at the reduced budget.
+ */
+export function legendColumnLayout(view, legends, margin) {
+  const items = legends.map(mark => mark.items[0]),
+        budget = Math.max(...items.map(item => item.maxHeight != null ? item.maxHeight : -Infinity));
+  if (!(budget > 0)) return;
+
+  const excess = items.reduce((h, item) => h + item.height, margin * (items.length - 1)) - budget;
+  if (excess <= 0) return;
+
+  const reducible = items.map(item => item.maxHeight != null
+    ? Math.max(0, item.items[0].items[0].bounds.height() - MinViewHeight)
+    : 0);
+  shrink(reducible, excess).forEach((dh, i) => {
+    if (dh > 0) legendLayout(view, legends[i], items[i].height - dh);
+  });
 }
 
 function legendBounds(item, b) {

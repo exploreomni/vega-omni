@@ -1,0 +1,74 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Two scrollable legends stacked on the right share the column's height budget.",
+  "width": 200,
+  "height": 150,
+  "padding": 5,
+  "autosize": "pad",
+
+  "data": [
+    {
+      "name": "source",
+      "transform": [{"type": "sequence", "start": 1, "stop": 25, "as": "x"}]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {"data": "source", "field": "x"},
+      "range": "width"
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "range": {"scheme": "category20"},
+      "domain": {"data": "source", "field": "x"}
+    },
+    {
+      "name": "size",
+      "type": "ordinal",
+      "range": [20, 40, 60],
+      "domain": [1, 2, 3]
+    }
+  ],
+
+  "axes": [{"scale": "x", "orient": "bottom"}],
+
+  "legends": [
+    {
+      "fill": "color",
+      "title": "Many",
+      "orient": "right",
+      "symbolLimit": 0,
+      "maxHeight": 250
+    },
+    {
+      "size": "size",
+      "title": "Few",
+      "orient": "right"
+    },
+    {
+      "fill": "color",
+      "title": "Many too",
+      "orient": "right",
+      "symbolLimit": 0,
+      "maxHeight": 250
+    }
+  ],
+
+  "marks": [
+    {
+      "type": "symbol",
+      "from": {"data": "source"},
+      "encode": {
+        "update": {
+          "x": {"scale": "x", "field": "x"},
+          "y": {"value": 75},
+          "fill": {"scale": "color", "field": "x"}
+        }
+      }
+    }
+  ]
+}

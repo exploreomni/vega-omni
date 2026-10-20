@@ -7,7 +7,7 @@ import {
 
 import {axisLayout, isYAxis} from './layout/axis.js';
 import {gridLayout, trellisLayout} from './layout/grid.js';
-import {legendEntryColumns, legendLayout, legendParams} from './layout/legend.js';
+import {legendColumnLayout, legendEntryColumns, legendLayout, legendParams} from './layout/legend.js';
 import {titleLayout} from './layout/title.js';
 
 import {Transform} from 'vega-dataflow';
@@ -99,10 +99,12 @@ function layoutGroup(view, group, _) {
 
     // perform grid layout for each orient group
     for (const orient in l) {
-      const g = l[orient];
-      gridLayout(view, g, legendParams(
-        g, orient, _.legends, xBounds, yBounds, width, height
-      ));
+      const g = l[orient],
+            params = legendParams(g, orient, _.legends, xBounds, yBounds, width, height);
+      if (params.columns === 1 && g.length > 1) {
+        legendColumnLayout(view, g.map(item => item.mark), params.padding);
+      }
+      gridLayout(view, g, params);
     }
 
     // update view bounds

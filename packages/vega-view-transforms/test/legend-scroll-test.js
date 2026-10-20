@@ -1,6 +1,6 @@
 import tape from 'tape';
 import {Bounds} from 'vega-scenegraph';
-import {legendScrollLayout, legendScrollbarLayout, scrollEntries} from '../src/layout/legend-scroll.js';
+import {legendScrollLayout, legendScrollbarLayout, scrollEntries, shrink} from '../src/layout/legend-scroll.js';
 
 const view = {dirty() {}};
 
@@ -31,7 +31,7 @@ function legend(n, props) {
 tape('legendScrollLayout clips entries that overflow maxHeight', t => {
   const {item, entry, entries} = legend(10, {maxHeight: 50});
 
-  legendScrollLayout(view, item, entry);
+  legendScrollLayout(view, item, entry, item.maxHeight);
   t.equal(entry.clip, true);
   t.equal(entry.height, 50);
   t.equal(entry.width, 60 + 8, 'content width plus scrollbar gutter');
@@ -41,13 +41,13 @@ tape('legendScrollLayout clips entries that overflow maxHeight', t => {
 
   // a stale offset is clamped and applied
   item._scroll = 500;
-  legendScrollLayout(view, item, entry);
+  legendScrollLayout(view, item, entry, item.maxHeight);
   t.equal(item._scroll, 77);
   t.equal(entries[0].y, -77);
   t.equal(entries[0].bounds.y1, -77);
 
   // layout runs again without the grid resetting positions: nothing moves
-  legendScrollLayout(view, item, entry);
+  legendScrollLayout(view, item, entry, item.maxHeight);
   t.equal(entries[0].y, -77);
   t.equal(item._scrollMax, 77, 'content height measured independent of scroll');
 
@@ -55,7 +55,7 @@ tape('legendScrollLayout clips entries that overflow maxHeight', t => {
   entries.forEach((g, i) => { g.y = 13 * i; g.bounds.set(0, 13 * i, 60, 13 * i + 10); });
   entry.items[0].bounds.set(0, 0, 60, 127);
   entry._scrollY = 0;
-  legendScrollLayout(view, item, entry);
+  legendScrollLayout(view, item, entry, item.maxHeight);
   t.equal(entries[0].y, -77);
 
   // a budget with no room, as an unsized container gives, clips nothing
@@ -67,7 +67,7 @@ tape('legendScrollLayout clips entries that overflow maxHeight', t => {
 
   // room for everything: no clip, entries back in place
   item.maxHeight = 200;
-  legendScrollLayout(view, item, entry);
+  legendScrollLayout(view, item, entry, item.maxHeight);
   t.equal(entry.clip, false);
   t.equal(item._scroll, 0);
   t.equal(entries[0].y, 0);
@@ -81,12 +81,37 @@ tape('legendScrollLayout leaves room for a stacked title', t => {
   item.datum.title = true;
   item.items.splice(1, 0, {items: [title], bounds: new Bounds()});
 
-  legendScrollLayout(view, item, entry);
+  legendScrollLayout(view, item, entry, item.maxHeight);
   t.equal(entry.height, 50 - 4 - 11 - 5);
 
   title.orient = 'left';
-  legendScrollLayout(view, item, entry);
+  legendScrollLayout(view, item, entry, item.maxHeight);
   t.equal(entry.height, 50 - 4);
+  t.end();
+});
+
+tape('a scroll to the end survives a pass at a bigger viewport', t => {
+  const view = {dirty() {}},
+        {item, entry} = legend(10, {maxHeight: 50});
+
+  legendScrollLayout(view, item, entry, item.maxHeight);
+  const end = item._scrollMax;
+  item._scroll = item._scrollWanted = end;
+
+  // measured at a bigger viewport, then narrowed again, as a side legend
+  // is when the slot's room is less than its maxHeight
+  legendScrollLayout(view, item, entry, 80);
+  t.ok(item._scroll < end, 'clamped to the bigger viewport\'s range');
+  legendScrollLayout(view, item, entry, item.maxHeight);
+  t.equal(item._scroll, end, 'back at the end');
+  t.equal(entry._scrollY, end);
+
+  // a pass where everything fits, as a legend sharing a slot is measured
+  // before the slot narrows it, keeps the offset too
+  legendScrollLayout(view, item, entry, 200);
+  t.equal(item._scroll, 0, 'nothing to scroll');
+  legendScrollLayout(view, item, entry, item.maxHeight);
+  t.equal(item._scroll, end, 'back at the end again');
   t.end();
 });
 
@@ -104,7 +129,7 @@ tape('scrollEntries moves by the difference from the applied offset', t => {
 tape('legendScrollbarLayout sizes the thumb to the visible fraction', t => {
   const {item, entry, thumb} = legend(10, {maxHeight: 50});
   entry.x = 3; entry.y = 7;
-  legendScrollLayout(view, item, entry);
+  legendScrollLayout(view, item, entry, item.maxHeight);
   legendScrollbarLayout(view, item, entry);
   t.equal(thumb.x, 3 + 68 - 4);
   t.equal(thumb.width, 4);
@@ -112,13 +137,13 @@ tape('legendScrollbarLayout sizes the thumb to the visible fraction', t => {
   t.equal(thumb.y, 7);
 
   item._scroll = 77;
-  legendScrollLayout(view, item, entry);
+  legendScrollLayout(view, item, entry, item.maxHeight);
   legendScrollbarLayout(view, item, entry);
   t.equal(thumb.y, 7 + 50 - thumb.height, 'thumb at the bottom when fully scrolled');
   t.equal(thumb.bounds.y2, thumb.y + thumb.height);
 
   item.maxHeight = 200;
-  legendScrollLayout(view, item, entry);
+  legendScrollLayout(view, item, entry, item.maxHeight);
   legendScrollbarLayout(view, item, entry);
   t.equal(thumb.width, 0, 'hidden when nothing overflows');
   t.end();
@@ -170,8 +195,8 @@ tape('wheel events scroll the legend under the pointer', t => {
   entries.forEach(g => g.mark = entry.items[0].mark);
   const symbol = {mark: {role: 'legend-symbol', group: entries[2]}};
 
-  legendScrollLayout(view, item, entry);
-  legendScrollLayout(view, item, entry);
+  legendScrollLayout(view, item, entry, item.maxHeight);
+  legendScrollLayout(view, item, entry, item.maxHeight);
   t.equal(Object.keys(listeners).join(), 'wheel', 'registered once');
 
   const wheel = (deltaY, deltaMode = 0) => {
@@ -202,5 +227,12 @@ tape('wheel events scroll the legend under the pointer', t => {
   listeners.wheel(evt, {mark: {role: 'mark', group: null}});
   listeners.wheel(evt, null);
   t.equal(evt.prevented, false);
+  t.end();
+});
+
+tape('shrink splits the excess in proportion to what each legend can give', t => {
+  t.deepEqual(shrink([100, 50, 0], 30), [20, 10, 0]);
+  t.deepEqual(shrink([100, 50, 0], 300), [100, 50, 0], 'never past what is reducible');
+  t.deepEqual(shrink([0, 0], 30), [0, 0]);
   t.end();
 });

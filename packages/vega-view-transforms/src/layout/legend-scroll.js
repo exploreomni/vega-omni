@@ -11,17 +11,17 @@ const LegendRole = 'legend',
 const clamp = (v, max) => Math.max(0, Math.min(max, v || 0));
 
 /**
- * Size a symbol legend's entry group to the legend's maxHeight. Entries that
+ * Size a symbol legend's entry group to a height budget. Entries that
  * overflow are clipped and offset by the legend's scroll position. Runs
  * before the title is placed, as the viewport leaves room for the title.
  */
-export function legendScrollLayout(view, item, entry) {
+export function legendScrollLayout(view, item, entry, maxHeight) {
   const scope = entry.items[0],
         title = item.datum.title ? item.items[1].items[0] : null,
         stacked = title && title.orient !== Left && title.orient !== Right,
         pad = item.padding || 0,
         bar = item.scrollbarWidth || 0,
-        viewHeight = Math.floor(item.maxHeight - 2 * pad
+        viewHeight = Math.floor(maxHeight - 2 * pad
           - (stacked ? title.bounds.height() + (item.titlePadding || 0) : 0)),
         contentHeight = Math.ceil(scope.bounds.y2 + (entry._scrollY || 0)),
         // no room at all (an unsized container) draws the legend unclipped
@@ -29,7 +29,12 @@ export function legendScrollLayout(view, item, entry) {
 
   item._scrollMax = Math.max(0, max);
   item._scrollView = viewHeight;
-  item._scroll = max > 0 ? clamp(item._scroll, max) : 0;
+  // _scrollWanted is the wheel's offset. A layout may measure at a bigger
+  // viewport first, even one where everything fits; clamping _scroll there
+  // would lose the end of the list once a later pass narrows the viewport.
+  item._scroll = max > 0
+    ? clamp(item._scrollWanted != null ? item._scrollWanted : item._scroll, max)
+    : 0;
   scrollEntries(view, entry, item._scroll);
 
   if (max > 0) {
@@ -65,6 +70,16 @@ export function scrollEntries(view, entry, scroll) {
   entry._scrollY = scroll;
 }
 
+/** The viewport height a scrollable legend keeps when its slot is short of room. */
+export const MinViewHeight = 40;
+
+/** Split `excess` across `reducible` in proportion, taking no more than each can give. */
+export function shrink(reducible, excess) {
+  const total = reducible.reduce((a, b) => a + b, 0),
+        take = Math.min(excess, total);
+  return reducible.map(r => total ? Math.round(take * r / total) : 0);
+}
+
 /**
  * Register the view's wheel listener once a legend can scroll. Handlers run
  * inside the browser's event dispatch, so preventDefault lands before the
@@ -81,7 +96,7 @@ export function legendScrollEvents(view) {
     if (scroll === legend._scroll) return;
 
     evt.preventDefault();
-    legend._scroll = scroll;
+    legend._scroll = legend._scrollWanted = scroll;
     const entry = legend.items[0].items[0];
     scrollEntries(view, entry, scroll);
     view.dirty(entry);
