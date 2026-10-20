@@ -103,7 +103,7 @@ export function legendEntryColumns(group, opt) {
         entries = gridLayoutGroups(group).marks,
         // a scrollable legend keeps its scrollbar gutter whether or not it overflows
         gutter = legend.maxHeight != null ? 2 * (legend.scrollbarWidth || 0) : 0,
-        avail = (legend.maxWidth != null ? legend.maxWidth : Infinity)
+        avail = (opt.maxWidth != null ? opt.maxWidth : Infinity)
           - 2 * (legend.padding || 0) - gutter,
         columns = fitColumns(entries.map(bboxFull), avail,
           get(opt.align, Column), get(opt.padding, Column));

@@ -30,13 +30,13 @@ tape('fitColumns picks the most columns whose grid fits', t => {
   t.end();
 });
 
-tape('legendEntryColumns resolves auto columns against the legend maxWidth', t => {
+tape('legendEntryColumns resolves auto columns against the layout maxWidth', t => {
   const entries = [50, 30, 40, 20].map(w => ({x: 0, y: 0, bounds: box(0, w)})),
         group = {
-          mark: {group: {maxWidth: 110, padding: 5}},
+          mark: {group: {padding: 5}},
           items: [{marktype: 'group', role: 'scope', items: entries}]
         },
-        opt = {columns: 'auto', align: 'each', padding: {row: 2, column: 10}};
+        opt = {columns: 'auto', maxWidth: 110, align: 'each', padding: {row: 2, column: 10}};
 
   // available 100: two columns (50+30+10) fit, three (50+30+40 + 2*10) do not
   const resolved = legendEntryColumns(group, opt);
@@ -45,12 +45,12 @@ tape('legendEntryColumns resolves auto columns against the legend maxWidth', t =
   t.deepEqual(entries.map(e => [e.row, e.column]), [[0, 0], [0, 1], [1, 0], [1, 1]]);
 
   // a scrollable legend reserves its scrollbar gutter: 95 - 8 < 90 leaves one column
-  group.mark.group = {maxWidth: 105, padding: 5, maxHeight: 50, scrollbarWidth: 4};
-  t.equal(legendEntryColumns(group, opt).columns, 1);
+  group.mark.group = {padding: 5, maxHeight: 50, scrollbarWidth: 4};
+  t.equal(legendEntryColumns(group, {...opt, maxWidth: 105}).columns, 1);
 
   // no maxWidth: a single row
   group.mark.group = {padding: 0};
-  t.equal(legendEntryColumns(group, opt).columns, 4);
+  t.equal(legendEntryColumns(group, {...opt, maxWidth: undefined}).columns, 4);
 
   // numeric columns pass through untouched
   t.equal(legendEntryColumns(group, {columns: 3}).columns, 3);

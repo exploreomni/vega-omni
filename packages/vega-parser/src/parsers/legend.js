@@ -96,7 +96,11 @@ export default function(spec, scope) {
   else {
     // determine legend symbol group layout
     entryLayout = legendSymbolLayout(spec, config);
-    // auto columns are resolved at layout time; encoders only need a non-zero count
+    // auto columns are resolved at layout time, which re-runs when maxWidth
+    // changes; encoders only need a non-zero count
+    if (entryLayout.columns === Auto && _('maxWidth') != null) {
+      entryLayout.maxWidth = _('maxWidth');
+    }
     const columns = entryLayout.columns === Auto ? 1 : deref(entryLayout.columns);
     children = [
       legendSymbolGroups(spec, config, encode, entryRef, columns)
