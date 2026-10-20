@@ -103,6 +103,7 @@ export function resizeView(viewWidth, viewHeight, width, height, origin, auto) {
     if (rerun) {
       view._autosizePass = (view._autosizePass || 0) + 1;
       if (view._autosizePass < MaxAutosizePasses) view._autosize = 1;
+      else view._autosizePass = 0;
       view.run('enter');
     } else {
       view._autosizePass = 0;
