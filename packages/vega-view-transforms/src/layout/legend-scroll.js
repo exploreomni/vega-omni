@@ -5,6 +5,8 @@ const LegendRole = 'legend',
       ScrollbarRole = 'legend-scrollbar',
       ScrollFadeRole = 'legend-scroll-fade',
       WheelEvent = 'wheel',
+      TouchStartEvent = 'touchstart',
+      TouchMoveEvent = 'touchmove',
       LineHeight = 16,
       FadeHeight = 24;
 
@@ -35,11 +37,12 @@ export function legendScrollLayout(view, item, entry, maxHeight, viewWidth) {
 
   item._scrollMax = Math.max(0, max);
   item._scrollView = viewHeight;
-  // _scrollWanted is the wheel's offset. A layout may measure at a bigger
-  // viewport first, even one where everything fits; clamping _scroll there
-  // would lose the end of the list once a later pass narrows the viewport.
+  // _scrollWanted is the offset a wheel or touch asked for. A layout may
+  // measure at a bigger viewport first, even one where everything fits;
+  // clamping _scroll there would lose the end of the list once a later pass
+  // narrows the viewport.
   item._scroll = max > 0
-    ? clamp(item._scrollWanted != null ? item._scrollWanted : item._scroll, max)
+    ? Math.round(clamp(item._scrollWanted != null ? item._scrollWanted : item._scroll, max))
     : 0;
   scrollEntries(view, entry, item._scroll);
 
@@ -92,28 +95,52 @@ export function shrink(reducible, excess) {
 }
 
 /**
- * Register the view's wheel listener once a legend can scroll. Handlers run
- * inside the browser's event dispatch, so preventDefault lands before the
- * page scrolls; a wheel past either end is left to the page.
+ * Register the view's wheel and touch listeners once a legend can scroll.
+ * Handlers run inside the browser's event dispatch, so preventDefault lands
+ * before the page scrolls; a wheel or drag past either end is left to the
+ * page. A touchmove carries the item its touchstart picked.
  */
 export function legendScrollEvents(view) {
   if (view._legendScroll || !view.addEventListener) return;
   view._legendScroll = true;
+  // the y of a touch dragging a legend; null when the drag began elsewhere
+  let touchY = null;
+
   view.addEventListener(WheelEvent, (evt, item) => {
     const legend = scrollableLegend(item);
-    if (!legend) return;
-
-    const scroll = clamp(legend._scroll + wheelDelta(evt, legend._scrollView), legend._scrollMax);
-    if (scroll === legend._scroll) return;
-
-    evt.preventDefault();
-    legend._scroll = legend._scrollWanted = scroll;
-    const entry = legend.items[0].items[0];
-    scrollEntries(view, entry, scroll);
-    view.dirty(entry);
-    legendScrollbarLayout(view, legend, entry);
-    view.runAsync();
+    if (legend) scrollLegend(view, legend, wheelDelta(evt, legend._scrollView), evt);
   });
+  view.addEventListener(TouchStartEvent, (evt, item) => {
+    touchY = scrollableLegend(item) ? evt.changedTouches[0].clientY : null;
+  });
+  view.addEventListener(TouchMoveEvent, (evt, item) => {
+    const legend = scrollableLegend(item);
+    if (!legend || touchY == null) return;
+    const y = evt.changedTouches[0].clientY;
+    scrollLegend(view, legend, touchY - y, evt);
+    touchY = y;
+  });
+}
+
+// The offset keeps its fraction so small trackpad deltas add up; entries
+// sit on whole pixels, which keeps canvas text sharp.
+function scrollLegend(view, legend, delta, evt) {
+  const max = legend._scrollMax,
+        from = clamp(legend._scrollWanted != null ? legend._scrollWanted : legend._scroll, max),
+        wanted = clamp(from + delta, max);
+  if (wanted === from) return;
+
+  evt.preventDefault();
+  legend._scrollWanted = wanted;
+  const scroll = Math.round(wanted);
+  if (scroll === legend._scroll) return;
+
+  legend._scroll = scroll;
+  const entry = legend.items[0].items[0];
+  scrollEntries(view, entry, scroll);
+  view.dirty(entry);
+  legendScrollbarLayout(view, legend, entry);
+  view.runAsync();
 }
 
 function scrollableLegend(item) {

@@ -199,7 +199,8 @@ tape('legendScrollbarLayout fades the last rows while more can be scrolled', t =
   t.end();
 });
 
-tape('wheel events scroll the legend under the pointer', t => {
+// a laid-out scrolling legend, the view's event listeners, and a symbol in it
+function scrolling() {
   const listeners = {},
         runs = [],
         view = {
@@ -207,7 +208,8 @@ tape('wheel events scroll the legend under the pointer', t => {
           runAsync() { runs.push(1); },
           addEventListener(type, handler) { (listeners[type] = listeners[type] || []).push(handler); }
         },
-        {item, entry, entries, thumb} = legend(10, {maxHeight: 50});
+        parts = legend(10, {maxHeight: 50}),
+        {item, entry, entries} = parts;
 
   // the scene chain a picked symbol walks up: symbol -> scope group -> entry -> legend
   item.mark = {role: 'legend', group: null};
@@ -219,14 +221,22 @@ tape('wheel events scroll the legend under the pointer', t => {
 
   legendScrollLayout(view, item, entry, item.maxHeight);
   legendScrollLayout(view, item, entry, item.maxHeight);
-  t.deepEqual(Object.keys(listeners), ['wheel']);
-  t.equal(listeners.wheel.length, 1, 'registered once');
 
-  const wheel = (deltaY, deltaMode = 0) => {
-    const evt = {deltaY, deltaMode, prevented: false, preventDefault() { this.prevented = true; }};
-    listeners.wheel[0](evt, symbol);
+  const fire = (type, evt, target = symbol) => {
+    evt.prevented = false;
+    evt.preventDefault = () => { evt.prevented = true; };
+    listeners[type][0](evt, target);
     return evt.prevented;
   };
+  return {...parts, listeners, runs, fire};
+}
+
+tape('wheel events scroll the legend under the pointer', t => {
+  const {item, entries, thumb, listeners, runs, fire} = scrolling();
+  t.deepEqual(Object.keys(listeners), ['wheel', 'touchstart', 'touchmove']);
+  t.ok(Object.values(listeners).every(l => l.length === 1), 'registered once');
+
+  const wheel = (deltaY, deltaMode = 0) => fire('wheel', {deltaY, deltaMode});
 
   t.equal(wheel(30), true);
   t.equal(item._scroll, 30);
@@ -246,10 +256,43 @@ tape('wheel events scroll the legend under the pointer', t => {
   t.equal(wheel(-10), false, 'past the start the page scrolls');
 
   // a wheel outside any legend is ignored
-  const evt = {deltaY: 10, prevented: false, preventDefault() { this.prevented = true; }};
-  listeners.wheel[0](evt, {mark: {role: 'mark', group: null}});
-  listeners.wheel[0](evt, null);
-  t.equal(evt.prevented, false);
+  t.equal(fire('wheel', {deltaY: 10}, {mark: {role: 'mark', group: null}}), false);
+  t.equal(fire('wheel', {deltaY: 10}, null), false);
+  t.end();
+});
+
+tape('fractional wheel deltas add up, with entries on whole pixels', t => {
+  const {item, entries, fire} = scrolling();
+  const wheel = deltaY => fire('wheel', {deltaY, deltaMode: 0});
+
+  t.equal(wheel(0.4), true, 'a small delta still keeps the page still');
+  t.equal(entries[0].y, 0);
+  t.equal(wheel(0.4), true);
+  t.equal(item._scroll, 1);
+  t.equal(entries[0].y, -1);
+  t.equal(wheel(0.4), true);
+  t.equal(entries[0].y, -1);
+  t.end();
+});
+
+tape('a touch dragging a legend scrolls it', t => {
+  const {item, entries, fire} = scrolling();
+  const touch = (type, clientY, target) => fire(type, {changedTouches: [{clientY}]}, target);
+
+  touch('touchstart', 100);
+  t.equal(touch('touchmove', 70), true, 'dragging up scrolls down');
+  t.equal(item._scroll, 30);
+  t.equal(entries[0].y, -30);
+  t.equal(touch('touchmove', 80), true);
+  t.equal(item._scroll, 20);
+  t.equal(touch('touchmove', 200), true, 'clamped at the start');
+  t.equal(item._scroll, 0);
+  t.equal(touch('touchmove', 210), false, 'past the start the page scrolls');
+
+  // a drag that starts outside any legend is left to the page
+  touch('touchstart', 100, {mark: {role: 'mark', group: null}});
+  t.equal(touch('touchmove', 70), false);
+  t.equal(item._scroll, 0);
   t.end();
 });
 
