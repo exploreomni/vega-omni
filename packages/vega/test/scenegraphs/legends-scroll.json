@@ -2923,7 +2923,7 @@
                       ],
                       "x": 0,
                       "y": 16,
-                      "width": 166,
+                      "width": 200,
                       "height": 44,
                       "fill": "transparent"
                     }
@@ -2961,7 +2961,7 @@
                   "clip": false,
                   "items": [
                     {
-                      "x": 162,
+                      "x": 196,
                       "y": 16,
                       "width": 4,
                       "height": 25,
@@ -2974,7 +2974,7 @@
               ],
               "x": 0,
               "y": 185,
-              "width": 166,
+              "width": 200,
               "height": 60,
               "orient": "bottom"
             }

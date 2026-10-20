@@ -39,6 +39,7 @@ export function legendParams(g, orient, config, xb, yb, w, h) {
     align:   Each,
     bounds:  _('bounds', Flush),
     columns: _('direction') === 'vertical' ? 1 : g.length,
+    span:    frame === Bounds ? xb.width() : (w || yb.width() + 2 * yb.x1),
     padding: _('margin', 8),
     center:  _('center'),
     nodirty: true
@@ -139,7 +140,7 @@ export function fitColumns(boxes, avail, align, padding) {
   return Math.max(1, ncols);
 }
 
-export function legendLayout(view, legend, maxHeight) {
+export function legendLayout(view, legend, maxHeight, viewWidth) {
   var item = legend.items[0],
       datum = item.datum,
       orient = item.orient,
@@ -157,7 +158,8 @@ export function legendLayout(view, legend, maxHeight) {
 
   // clip entries to maxHeight before the title is placed against them
   if (scroll) {
-    legendScrollLayout(view, item, entry, maxHeight != null ? maxHeight : item.maxHeight);
+    legendScrollLayout(view, item, entry,
+      maxHeight != null ? maxHeight : item.maxHeight, viewWidth);
   }
 
   // adjust legend to accommodate padding and title
@@ -194,22 +196,33 @@ export function legendLayout(view, legend, maxHeight) {
  * Fit the legends stacked in one orient column within the largest maxHeight
  * among them. Legends without a maxHeight keep their height; scrollable ones
  * give up viewport in proportion, down to MinViewHeight, and are laid out
- * again at the reduced budget.
+ * again at the reduced budget. In a top or bottom slot `span` is the slot's
+ * width, which a scrolling legend's viewport widens to (see legendRowLayout).
  */
-export function legendColumnLayout(view, legends, margin) {
+export function legendColumnLayout(view, legends, margin, span) {
   const items = legends.map(mark => mark.items[0]),
-        budget = Math.max(...items.map(item => item.maxHeight != null ? item.maxHeight : -Infinity));
-  if (!(budget > 0)) return;
+        budget = Math.max(...items.map(item => item.maxHeight != null ? item.maxHeight : -Infinity)),
+        excess = budget > 0
+          ? items.reduce((h, item) => h + item.height, margin * (items.length - 1)) - budget
+          : 0,
+        reducible = items.map(item => excess > 0 && item.maxHeight != null
+          ? Math.max(0, item.items[0].items[0].bounds.height() - MinViewHeight)
+          : 0);
 
-  const excess = items.reduce((h, item) => h + item.height, margin * (items.length - 1)) - budget;
-  if (excess <= 0) return;
-
-  const reducible = items.map(item => item.maxHeight != null
-    ? Math.max(0, item.items[0].items[0].bounds.height() - MinViewHeight)
-    : 0);
-  shrink(reducible, excess).forEach((dh, i) => {
-    if (dh > 0) legendLayout(view, legends[i], items[i].height - dh);
+  shrink(reducible, Math.max(0, excess)).forEach((dh, i) => {
+    if (dh > 0) legendLayout(view, legends[i], items[i].height - dh, span);
+    else if (span != null && items[i]._scrollMax > 0) legendLayout(view, legends[i], null, span);
   });
+}
+
+/**
+ * A scrolling legend alone in a top or bottom slot widens its viewport to
+ * the slot, so its scrollbar sits at the slot's edge, not against the last
+ * column.
+ */
+export function legendRowLayout(view, legends, span) {
+  const item = legends[0].items[0];
+  if (legends.length === 1 && item._scrollMax > 0) legendLayout(view, legends[0], null, span);
 }
 
 function legendBounds(item, b) {

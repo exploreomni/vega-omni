@@ -11,11 +11,12 @@ const LegendRole = 'legend',
 const clamp = (v, max) => Math.max(0, Math.min(max, v || 0));
 
 /**
- * Size a symbol legend's entry group to a height budget. Entries that
- * overflow are clipped and offset by the legend's scroll position. Runs
- * before the title is placed, as the viewport leaves room for the title.
+ * Size a symbol legend's entry group to a height budget, and to a viewport
+ * width when given. Overflowing entries are clipped and shifted by the
+ * legend's scroll offset. Runs before the title is placed; the viewport
+ * leaves room for it.
  */
-export function legendScrollLayout(view, item, entry, maxHeight) {
+export function legendScrollLayout(view, item, entry, maxHeight, viewWidth) {
   const scope = entry.items[0],
         title = item.datum.title ? item.items[1].items[0] : null,
         stacked = title && title.orient !== Left && title.orient !== Right,
@@ -40,7 +41,10 @@ export function legendScrollLayout(view, item, entry, maxHeight) {
   if (max > 0) {
     legendScrollEvents(view);
     entry.clip = true;
-    entry.width = Math.ceil(scope.bounds.x2) + 2 * bar;
+    entry.width = Math.max(
+      Math.ceil(scope.bounds.x2) + 2 * bar,
+      viewWidth != null ? viewWidth - 2 * pad : 0
+    );
     entry.height = viewHeight;
     entry.bounds.set(entry.x, entry.y, entry.x + entry.width, entry.y + entry.height);
   } else {

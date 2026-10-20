@@ -58,9 +58,16 @@ tape('legendScrollLayout clips entries that overflow maxHeight', t => {
   legendScrollLayout(view, item, entry, item.maxHeight);
   t.equal(entries[0].y, -77);
 
+  // a viewport width widens the clip box but never narrows it
+  legendScrollLayout(view, item, entry, item.maxHeight, 120);
+  t.equal(entry.width, 120);
+  t.equal(entry.bounds.x2, 120);
+  legendScrollLayout(view, item, entry, item.maxHeight, 50);
+  t.equal(entry.width, 68);
+
   // a budget with no room, as an unsized container gives, clips nothing
   item.maxHeight = -66;
-  legendScrollLayout(view, item, entry);
+  legendScrollLayout(view, item, entry, item.maxHeight);
   t.equal(entry.clip, false);
   t.equal(item._scrollMax, 0);
   t.equal(entries[0].y, 0);
