@@ -8,7 +8,8 @@ import {
 import {axisLayout, isYAxis} from './layout/axis.js';
 import {gridLayout, trellisLayout} from './layout/grid.js';
 import {
-  legendColumnLayout, legendEntryColumns, legendLayout, legendParams, legendRowLayout
+  legendColumnLayout, legendEntryColumns, legendLayout, legendParams, legendRoom,
+  legendRowLayout, legendSideLayout
 } from './layout/legend.js';
 import {titleLayout} from './layout/title.js';
 
@@ -103,11 +104,14 @@ function layoutGroup(view, group, _) {
     for (const orient in l) {
       const g = l[orient],
             params = legendParams(g, orient, _.legends, xBounds, yBounds, width, height);
-      const span = orient === Top || orient === Bottom ? params.span : null;
+      const span = orient === Top || orient === Bottom ? params.span : null,
+            room = orient === Left || orient === Right ? legendRoom(params, yBounds) : null;
       if (params.columns === 1 && g.length > 1) {
-        legendColumnLayout(view, g.map(item => item.mark), params.padding, span);
+        legendColumnLayout(view, g.map(item => item.mark), params.padding, span, room);
       } else if (span != null) {
         legendRowLayout(view, g.map(item => item.mark), span);
+      } else if (room != null) {
+        legendSideLayout(view, g.map(item => item.mark), room);
       }
       gridLayout(view, g, params);
     }

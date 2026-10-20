@@ -197,11 +197,13 @@ export function legendLayout(view, legend, maxHeight, viewWidth) {
  * among them. Legends without a maxHeight keep their height; scrollable ones
  * give up viewport in proportion, down to MinViewHeight, and are laid out
  * again at the reduced budget. In a top or bottom slot `span` is the slot's
- * width, which a scrolling legend's viewport widens to (see legendRowLayout).
+ * width, which a scrolling legend's viewport widens to (see legendRowLayout);
+ * in a left or right slot `room` caps the budget (see legendSideLayout).
  */
-export function legendColumnLayout(view, legends, margin, span) {
+export function legendColumnLayout(view, legends, margin, span, room) {
   const items = legends.map(mark => mark.items[0]),
-        budget = Math.max(...items.map(item => item.maxHeight != null ? item.maxHeight : -Infinity)),
+        maxHeight = Math.max(...items.map(item => item.maxHeight != null ? item.maxHeight : -Infinity)),
+        budget = room != null ? Math.min(maxHeight, room) : maxHeight,
         excess = budget > 0
           ? items.reduce((h, item) => h + item.height, margin * (items.length - 1)) - budget
           : 0,
@@ -223,6 +225,25 @@ export function legendColumnLayout(view, legends, margin, span) {
 export function legendRowLayout(view, legends, span) {
   const item = legends[0].items[0];
   if (legends.length === 1 && item._scrollMax > 0) legendLayout(view, legends[0], null, span);
+}
+
+/**
+ * A scrolling legend alone in a left or right slot stays within `room`, the
+ * height beside the plot and its axes from where the legend starts: a
+ * maxHeight taken from the container would run past the plot's bottom once
+ * a top or bottom legend has taken some of that height.
+ */
+export function legendSideLayout(view, legends, room) {
+  const item = legends[0].items[0];
+  if (item.maxHeight != null && item.maxHeight > room) legendLayout(view, legends[0], room);
+}
+
+/** The height beside the plot a left or right legend can take, from where it starts. */
+export function legendRoom(params, yb) {
+  const a = params.anchor;
+  return Math.max(MinViewHeight, a.row === End ? a.y - yb.y1
+    : a.row === Middle ? yb.height()
+    : yb.y2 - a.y);
 }
 
 function legendBounds(item, b) {
