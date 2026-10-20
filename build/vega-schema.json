@@ -30,6 +30,9 @@
             "resize": {
               "type": "boolean"
             },
+            "refit": {
+              "type": "boolean"
+            },
             "contains": {
               "enum": [
                 "content",
