@@ -72,14 +72,19 @@ tape('A scrolling bottom legend spans its slot within maxWidth', async t => {
   t.end();
 });
 
-tape('Autosize fits again when a legend wraps to more rows at the fitted width', async t => {
+tape('Autosize refit fits again when a legend wraps to more rows at the fitted width', async t => {
   // the y axis narrows the plot from 200, and the legend wraps to more rows
   // at the narrower width than the first fit measured
-  const view = new vega.View(vega.parse({
+  const render = async refit => {
+    const view = new vega.View(vega.parse(spec(refit)), {renderer: 'none'});
+    await view.runAsync();
+    return view.scenegraph().root.bounds.height();
+  };
+  const spec = refit => ({
     width: 200,
     height: 300,
     padding: 5,
-    autosize: {type: 'fit', contains: 'padding'},
+    autosize: {type: 'fit', contains: 'padding', refit},
     data: [{
       name: 'source',
       transform: [{type: 'sequence', start: 1, stop: 13, as: 'x'}]
@@ -98,10 +103,11 @@ tape('Autosize fits again when a legend wraps to more rows at the fitted width',
       fill: 'color', orient: 'bottom', direction: 'horizontal',
       columns: 'auto', maxWidth: {signal: 'width'}
     }]
-  }), {renderer: 'none'});
-  await view.runAsync();
+  });
 
-  const height = view.scenegraph().root.bounds.height();
+  const height = await render(true);
   t.ok(height <= 300, `${height} fits 300`);
+  const once = await render(false);
+  t.ok(once > 300, `without refit, one fit overflows: ${once}`);
   t.end();
 });

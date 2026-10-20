@@ -20,6 +20,7 @@ const autosize = oneOf(
   object({
     _type_: autosizeType,
     resize: booleanType,
+    refit: booleanType,
     contains: enums(containsEnum)
   }),
   signalRef

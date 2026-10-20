@@ -4,5 +4,10 @@ export type AutoSize =
   | {
       type: AutoSizeType;
       resize?: boolean;
+      /**
+       * Fit again, up to twice, when the layout at the fitted size asks for
+       * another, as a legend wrapping to the plot width does.
+       */
+      refit?: boolean;
       contains?: 'content' | 'padding';
     };
