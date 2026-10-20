@@ -135,6 +135,7 @@ export function legendScrollbarLayout(view, item, entry) {
         fade = legendPart(item, ScrollFadeRole);
 
   if (thumb) {
+    thumb.cornerRadius = w / 2;
     placeRect(view, thumb, {
       x: entry.x + entry.width - (max > 0 ? w : 0),
       y: entry.y + (max > 0 ? Math.round((viewHeight - h) * item._scroll / max) : 0),

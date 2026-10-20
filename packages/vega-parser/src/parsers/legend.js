@@ -1,4 +1,4 @@
-import {addEncoders, encoder, extendEncode} from './encode/util.js';
+import {addEncoders, extendEncode} from './encode/util.js';
 import guideMark from './guides/guide-mark.js';
 import {RectMark} from './marks/marktypes.js';
 import {
@@ -17,7 +17,7 @@ import {
   LegendEntryRole, LegendRole, LegendScrollFadeRole, LegendScrollbarRole
 } from './marks/roles.js';
 
-import {deref, ref, value} from '../util.js';
+import {deref, ref} from '../util.js';
 import {Collect, LegendEntries} from '../transforms.js';
 
 import {parseExpression} from 'vega-functions';
@@ -126,10 +126,13 @@ export default function(spec, scope) {
   if (scrollable && type === Symbols) {
     const fade = _('scrollFadeColor');
     if (fade != null) {
-      const color = isObject(fade) && fade.signal ? fade.signal : stringValue(fade);
-      // the first stop is the fade color at zero alpha, not 'transparent':
-      // a renderer that interpolates unpremultiplied blends black into it
-      const clear = `'rgba(' + rgb(${color}).r + ',' + rgb(${color}).g + ',' + rgb(${color}).b + ',0)'`;
+      const color = isObject(fade)
+              ? (fade.signal ? `(${fade.signal})` : stringValue(fade.value))
+              : stringValue(fade),
+            rgba = `rgb(${color})`,
+            // the first stop is the fade color at zero alpha, not 'transparent':
+            // a renderer that interpolates unpremultiplied blends black into it
+            clear = `'rgba(' + ${rgba}.r + ',' + ${rgba}.g + ',' + ${rgba}.b + ',0)'`;
       children.push(guideMark({
         type: RectMark,
         role: LegendScrollFadeRole,
@@ -137,26 +140,24 @@ export default function(spec, scope) {
         encode: {
           enter: {
             width: {value: 0},
-            height: {value: 0},
+            height: {value: 0}
+          },
+          update: {
+            // a color rgb() cannot parse, such as 'transparent', draws no fade
             fill: {
-              signal: `{gradient: 'linear', x1: 0, y1: 0, x2: 0, y2: 1, stops: [{offset: 0, color: ${clear}}, {offset: 1, color: ${color}}]}`
+              signal: `isFinite(${rgba}.r) ? {gradient: 'linear', x1: 0, y1: 0, x2: 0, y2: 1, stops: [{offset: 0, color: ${clear}}, {offset: 1, color: ${color}}]} : null`
             }
           }
         }
       }));
     }
+    const thumbEncode = {enter: {width: {value: 0}, height: {value: 0}}, update: {}};
+    addEncoders(thumbEncode, {fill: _('scrollbarColor')});
     children.push(guideMark({
       type: RectMark,
       role: LegendScrollbarRole,
       from: dataRef,
-      encode: {
-        enter: {
-          width: {value: 0},
-          height: {value: 0},
-          fill: encoder(_('scrollbarColor')),
-          cornerRadius: {signal: `(${deref(value(_('scrollbarWidth'), 0))}) / 2`}
-        }
-      }
+      encode: thumbEncode
     }));
   }
 
