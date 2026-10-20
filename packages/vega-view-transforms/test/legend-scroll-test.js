@@ -154,6 +154,16 @@ tape('legendScrollbarLayout sizes the thumb to the visible fraction', t => {
   t.equal(thumb.y, 7 + 50 - thumb.height, 'thumb at the bottom when fully scrolled');
   t.equal(thumb.bounds.y2, thumb.y + thumb.height);
 
+  // a viewport shorter than the thumb's minimum: the thumb fills it
+  legendScrollLayout(view, item, entry, 6);
+  legendScrollbarLayout(view, item, entry);
+  t.equal(item._scrollView, 10);
+  item.scrollbarWidth = 6;
+  legendScrollbarLayout(view, item, entry);
+  t.equal(thumb.height, 10);
+  t.equal(thumb.y, 7, 'within the viewport when fully scrolled');
+  item.scrollbarWidth = 4;
+
   item.maxHeight = 200;
   legendScrollLayout(view, item, entry, item.maxHeight);
   legendScrollbarLayout(view, item, entry);

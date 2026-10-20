@@ -133,7 +133,9 @@ export function legendScrollbarLayout(view, item, entry) {
   const max = item._scrollMax,
         viewHeight = item._scrollView,
         w = item.scrollbarWidth || 0,
-        h = max > 0 ? Math.max(2 * w, Math.round(viewHeight * viewHeight / (viewHeight + max))) : 0,
+        h = max > 0
+          ? Math.min(viewHeight, Math.max(2 * w, Math.round(viewHeight * viewHeight / (viewHeight + max))))
+          : 0,
         thumb = legendPart(item, ScrollbarRole),
         fade = legendPart(item, ScrollFadeRole);
 
