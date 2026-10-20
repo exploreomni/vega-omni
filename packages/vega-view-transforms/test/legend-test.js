@@ -44,6 +44,10 @@ tape('legendEntryColumns resolves auto columns against the legend maxWidth', t =
   t.equal(opt.columns, 'auto', 'layout options are not mutated');
   t.deepEqual(entries.map(e => [e.row, e.column]), [[0, 0], [0, 1], [1, 0], [1, 1]]);
 
+  // a scrollable legend reserves its scrollbar gutter: 95 - 8 < 90 leaves one column
+  group.mark.group = {maxWidth: 105, padding: 5, maxHeight: 50, scrollbarWidth: 4};
+  t.equal(legendEntryColumns(group, opt).columns, 1);
+
   // no maxWidth: a single row
   group.mark.group = {padding: 0};
   t.equal(legendEntryColumns(group, opt).columns, 4);

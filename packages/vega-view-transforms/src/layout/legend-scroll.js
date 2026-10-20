@@ -1,0 +1,125 @@
+import {Left, Right} from '../constants.js';
+import {Marks} from 'vega-scenegraph';
+
+const LegendRole = 'legend',
+      ScrollbarRole = 'legend-scrollbar',
+      WheelEvent = 'wheel',
+      LineHeight = 16;
+
+const clamp = (v, max) => Math.max(0, Math.min(max, v || 0));
+
+/**
+ * Size a symbol legend's entry group to the legend's maxHeight. Entries that
+ * overflow are clipped and offset by the legend's scroll position. Runs
+ * before the title is placed, as the viewport leaves room for the title.
+ */
+export function legendScrollLayout(view, item, entry) {
+  const scope = entry.items[0],
+        title = item.datum.title ? item.items[1].items[0] : null,
+        stacked = title && title.orient !== Left && title.orient !== Right,
+        pad = item.padding || 0,
+        bar = item.scrollbarWidth || 0,
+        viewHeight = Math.floor(item.maxHeight - 2 * pad
+          - (stacked ? title.bounds.height() + (item.titlePadding || 0) : 0)),
+        contentHeight = Math.ceil(scope.bounds.y2 + (entry._scrollY || 0)),
+        // no room at all (an unsized container) draws the legend unclipped
+        max = viewHeight > 0 ? contentHeight - viewHeight : 0;
+
+  item._scrollMax = Math.max(0, max);
+  item._scrollView = viewHeight;
+  item._scroll = max > 0 ? clamp(item._scroll, max) : 0;
+  scrollEntries(view, entry, item._scroll);
+
+  if (max > 0) {
+    legendScrollEvents(view);
+    entry.clip = true;
+    entry.width = Math.ceil(scope.bounds.x2) + 2 * bar;
+    entry.height = viewHeight;
+    entry.bounds.set(entry.x, entry.y, entry.x + entry.width, entry.y + entry.height);
+  } else {
+    entry.clip = false;
+    entry.width = entry.height = 0;
+    entry.bounds.clear().union(scope.bounds).translate(entry.x, entry.y);
+  }
+  entry.mark.bounds.clear().union(entry.bounds);
+  view.dirty(entry);
+}
+
+/**
+ * Shift a legend entry group's entries so `scroll` pixels of content sit
+ * above the viewport. The applied offset is kept on the group, so repeat
+ * calls move entries by the difference only.
+ */
+export function scrollEntries(view, entry, scroll) {
+  const scope = entry.items[0],
+        dy = scroll - (entry._scrollY || 0);
+  if (!dy) return;
+  scope.items.forEach(g => {
+    g.y -= dy;
+    g.bounds.translate(0, -dy);
+    view.dirty(g);
+  });
+  scope.bounds.translate(0, -dy);
+  entry._scrollY = scroll;
+}
+
+/**
+ * Register the view's wheel listener once a legend can scroll. Handlers run
+ * inside the browser's event dispatch, so preventDefault lands before the
+ * page scrolls; a wheel past either end is left to the page.
+ */
+export function legendScrollEvents(view) {
+  if (view._legendScroll || !view.addEventListener) return;
+  view._legendScroll = true;
+  view.addEventListener(WheelEvent, (evt, item) => {
+    const legend = scrollableLegend(item);
+    if (!legend) return;
+
+    const scroll = clamp(legend._scroll + wheelDelta(evt, legend._scrollView), legend._scrollMax);
+    if (scroll === legend._scroll) return;
+
+    evt.preventDefault();
+    legend._scroll = scroll;
+    const entry = legend.items[0].items[0];
+    scrollEntries(view, entry, scroll);
+    view.dirty(entry);
+    legendScrollbarLayout(view, legend, entry);
+    view.runAsync();
+  });
+}
+
+function scrollableLegend(item) {
+  for (; item; item = item.mark.group) {
+    if (item.mark.role === LegendRole) return item._scrollMax > 0 ? item : null;
+  }
+  return null;
+}
+
+function wheelDelta(evt, viewHeight) {
+  return evt.deltaMode === 1 ? evt.deltaY * LineHeight
+    : evt.deltaMode === 2 ? evt.deltaY * viewHeight
+    : evt.deltaY;
+}
+
+/**
+ * Place the scrollbar thumb along the right edge of the entry viewport.
+ */
+export function legendScrollbarLayout(view, item, entry) {
+  const mark = item.items.find(m => m.role === ScrollbarRole),
+        thumb = mark && mark.items[0];
+  if (!thumb) return;
+
+  const max = item._scrollMax,
+        viewHeight = item._scrollView,
+        w = item.scrollbarWidth || 0,
+        h = max > 0 ? Math.max(2 * w, Math.round(viewHeight * viewHeight / (viewHeight + max))) : 0;
+
+  view.dirty(thumb);
+  thumb.width = max > 0 ? w : 0;
+  thumb.height = h;
+  thumb.x = entry.x + entry.width - thumb.width;
+  thumb.y = entry.y + (max > 0 ? Math.round((viewHeight - h) * item._scroll / max) : 0);
+  Marks.rect.bound(thumb.bounds.clear(), thumb);
+  mark.bounds.clear().union(thumb.bounds);
+  view.dirty(thumb);
+}

@@ -1,4 +1,6 @@
-import {addEncoders, extendEncode} from './encode/util.js';
+import {addEncoders, encoder, extendEncode} from './encode/util.js';
+import guideMark from './guides/guide-mark.js';
+import {RectMark} from './marks/marktypes.js';
 import {
   Auto, Discrete, Gradient,
   GuideLabelStyle, LegendScales, Skip, Symbols
@@ -11,9 +13,9 @@ import legendGradientLabels from './guides/legend-gradient-labels.js';
 import legendSymbolGroups, {legendSymbolLayout} from './guides/legend-symbol-groups.js';
 import legendTitle from './guides/legend-title.js';
 import parseMark from './mark.js';
-import {LegendEntryRole, LegendRole} from './marks/roles.js';
+import {LegendEntryRole, LegendRole, LegendScrollbarRole} from './marks/roles.js';
 
-import {deref, ref} from '../util.js';
+import {deref, ref, value} from '../util.js';
 import {Collect, LegendEntries} from '../transforms.js';
 
 import {parseExpression} from 'vega-functions';
@@ -28,7 +30,8 @@ export default function(spec, scope) {
         name = legendEncode.name || undefined,
         interactive = legendEncode.interactive,
         style = legendEncode.style,
-        scales = {};
+        scales = {},
+        scrollable = _('maxHeight') != null;
 
   let scale = 0, entryLayout, params, children;
 
@@ -52,6 +55,8 @@ export default function(spec, scope) {
 
   // encoding properties for legend entry sub-group
   const entryEncode = {enter: {x: {value: 0}, y: {value: 0}}};
+  // a scrollable entry group is hit-tested so wheel events can find it
+  if (scrollable) entryEncode.enter.fill = {value: 'transparent'};
 
   // data source for legend values
   const entryRef = ref(scope.add(LegendEntries(params = {
@@ -106,13 +111,30 @@ export default function(spec, scope) {
       encode: entryEncode,
       marks: children,
       layout: entryLayout,
-      interactive
+      interactive: interactive || scrollable
     })
   ];
 
   // include legend title if defined
   if (datum.title) {
     children.push(legendTitle(spec, config, encode.title, dataRef));
+  }
+
+  // scrollbar thumb, positioned by layout
+  if (scrollable && type === Symbols) {
+    children.push(guideMark({
+      type: RectMark,
+      role: LegendScrollbarRole,
+      from: dataRef,
+      encode: {
+        enter: {
+          width: {value: 0},
+          height: {value: 0},
+          fill: encoder(_('scrollbarColor')),
+          cornerRadius: {signal: `(${deref(value(_('scrollbarWidth'), 0))}) / 2`}
+        }
+      }
+    }));
   }
 
   // parse legend specification
@@ -167,6 +189,8 @@ function buildLegendEncode(_, spec, config) {
     x:            _('legendX'),
     y:            _('legendY'),
     maxWidth:     _('maxWidth'),
+    maxHeight:    _('maxHeight'),
+    scrollbarWidth: _('scrollbarWidth'),
 
     // accessibility support
     format:       spec.format,

@@ -29,7 +29,10 @@ inherits(ViewLayout, Transform, {
   transform(_, pulse) {
     const view = pulse.dataflow;
     _.mark.items.forEach(group => {
-      if (_.layout) trellisLayout(view, group, legendEntryColumns(group, _.layout));
+      if (_.layout) {
+        trellisLayout(view, group, legendEntryColumns(group, _.layout));
+        group._scrollY = 0; // the grid put entries back at their unscrolled positions
+      }
       layoutGroup(view, group, _);
     });
     return shouldReflow(_.mark.group) ? pulse.reflow() : pulse;

@@ -4,6 +4,7 @@ import {
   TopLeft, TopRight
 } from '../constants.js';
 import {bboxFull, get, gridLayoutGroups} from './grid.js';
+import {legendScrollLayout, legendScrollbarLayout} from './legend-scroll.js';
 import {boundStroke, multiLineOffset} from 'vega-scenegraph';
 
 // utility for looking up legend layout configuration
@@ -97,8 +98,10 @@ export function legendEntryColumns(group, opt) {
 
   const legend = group.mark.group,
         entries = gridLayoutGroups(group).marks,
+        // a scrollable legend keeps its scrollbar gutter whether or not it overflows
+        gutter = legend.maxHeight != null ? 2 * (legend.scrollbarWidth || 0) : 0,
         avail = (legend.maxWidth != null ? legend.maxWidth : Infinity)
-          - 2 * (legend.padding || 0),
+          - 2 * (legend.padding || 0) - gutter,
         columns = fitColumns(entries.map(bboxFull), avail,
           get(opt.align, Column), get(opt.padding, Column));
 
@@ -147,8 +150,16 @@ export function legendLayout(view, legend) {
     : item._bounds = bounds.clone();
   bounds.clear();
 
+  const entry = item.items[0].items[0],
+        scroll = datum.type === Symbols && item.maxHeight != null;
+
+  // clip entries to maxHeight before the title is placed against them
+  if (scroll) legendScrollLayout(view, item, entry);
+
   // adjust legend to accommodate padding and title
-  legendGroupLayout(view, item, item.items[0].items[0]);
+  legendGroupLayout(view, item, entry);
+
+  if (scroll) legendScrollbarLayout(view, item, entry);
 
   // aggregate bounds to determine size, and include origin
   bounds = legendBounds(item, bounds);

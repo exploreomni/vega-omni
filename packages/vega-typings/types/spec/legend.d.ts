@@ -323,6 +323,25 @@ export interface BaseLegend {
   maxWidth?: NumberValue;
 
   /**
+   * The maximum height in pixels of a symbol legend, including padding and title. Entries that do not fit are clipped and can be scrolled.
+   */
+  maxHeight?: NumberValue;
+
+  /**
+   * The color of the scrollbar thumb drawn when a symbol legend overflows `maxHeight`.
+   *
+   * __Default value:__ `"#888"`.
+   */
+  scrollbarColor?: ColorValue;
+
+  /**
+   * The width in pixels of the scrollbar thumb drawn when a symbol legend overflows `maxHeight`.
+   *
+   * __Default value:__ `4`.
+   */
+  scrollbarWidth?: NumberValue;
+
+  /**
    * The horizontal padding in pixels between symbol legend entries.
    *
    * __Default value:__ `10`.

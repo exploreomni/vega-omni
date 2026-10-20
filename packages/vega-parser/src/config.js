@@ -200,6 +200,8 @@ export default function() {
       symbolStrokeWidth: 1.5,
       symbolBaseFillColor: 'transparent',
       symbolBaseStrokeColor: gray,
+      scrollbarColor: gray,
+      scrollbarWidth: 4,
       titleLimit: 180,
       titleOrient: 'top',
       titlePadding: 5,

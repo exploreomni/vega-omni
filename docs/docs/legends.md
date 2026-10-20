@@ -30,6 +30,9 @@ Properties for specifying a legend. Legends accept one or more [scales](../scale
 | clipHeight    | {% include type t="Number" %}  | The height in pixels to clip symbol legend entries and limit their size. By default no clipping is performed. |
 | columns       | {% include type t="Number" %}  | The number of columns in which to arrange symbol legend entries. A value of `0` or lower indicates a single row with one column per entry. The default is `0` for horizontal symbol legends and `1` for vertical symbol legends. The value `"auto"` arranges a horizontal symbol legend into as many columns as fit within _maxWidth_; a vertical symbol legend uses a single column. |
 | maxWidth      | {% include type t="Number" %}  | The maximum width in pixels of a symbol legend with `"auto"` _columns_, including padding. |
+| maxHeight     | {% include type t="Number" %}  | The maximum height in pixels of a symbol legend, including padding and title. Entries that do not fit are clipped and can be scrolled with the mouse wheel. |
+| scrollbarColor | {% include type t="Color" %}  | The color of the scrollbar thumb drawn when a symbol legend overflows _maxHeight_ (default `"#888"`). |
+| scrollbarWidth | {% include type t="Number" %} | The width in pixels of the scrollbar thumb drawn when a symbol legend overflows _maxHeight_ (default `4`). |
 | columnPadding | {% include type t="Number" %}  | The horizontal padding in pixels between symbol legend entries. |
 | rowPadding    | {% include type t="Number" %}  | The vertical padding in pixels between symbol legend entries. |
 | cornerRadius  | {% include type t="Number" %}  | Corner radius for the full legend. |
