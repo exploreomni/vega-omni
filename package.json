@@ -1,6 +1,6 @@
 {
   "name": "vega",
-  "version": "6.4.0-omni.1-rc.1",
+  "version": "6.4.0-omni.1-rc.2",
   "description": "The Vega visualization grammar.",
   "license": "BSD-3-Clause",
   "type": "module",

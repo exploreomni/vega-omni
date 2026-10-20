@@ -5909,6 +5909,19 @@
                 }
               ]
             },
+            "scrollFadeColor": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/colorValue"
+                }
+              ]
+            },
             "scrollbarColor": {
               "oneOf": [
                 {

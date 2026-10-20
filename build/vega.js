@@ -18663,7 +18663,7 @@
 
     // these roles are covered by related roles
     // we can ignore them, no need to generate attributes
-    const AriaIgnore = toSet(['axis-domain', 'axis-grid', 'axis-label', 'axis-tick', 'axis-title', 'legend-band', 'legend-entry', 'legend-gradient', 'legend-label', 'legend-scrollbar', 'legend-title', 'legend-symbol', 'title']);
+    const AriaIgnore = toSet(['axis-domain', 'axis-grid', 'axis-label', 'axis-tick', 'axis-title', 'legend-band', 'legend-entry', 'legend-gradient', 'legend-label', 'legend-scroll-fade', 'legend-scrollbar', 'legend-title', 'legend-symbol', 'title']);
 
     // aria attribute generators for guide roles
     const AriaGuides = {
@@ -20913,8 +20913,10 @@
     }
     const LegendRole$2 = 'legend',
       ScrollbarRole = 'legend-scrollbar',
+      ScrollFadeRole = 'legend-scroll-fade',
       WheelEvent = 'wheel',
-      LineHeight = 16;
+      LineHeight = 16,
+      FadeHeight = 24;
     const clamp = (v, max) => Math.max(0, Math.min(max, v || 0));
 
     /**
@@ -20931,13 +20933,18 @@
         bar = item.scrollbarWidth || 0,
         viewHeight = Math.floor(maxHeight - 2 * pad - (stacked ? title.bounds.height() + (item.titlePadding || 0) : 0)),
         contentHeight = Math.ceil(scope.bounds.y2 + (entry._scrollY || 0)),
-        max = contentHeight - viewHeight;
+        // no room at all (an unsized container) draws the legend unclipped
+        max = viewHeight > 0 ? contentHeight - viewHeight : 0;
       item._scrollMax = Math.max(0, max);
       item._scrollView = viewHeight;
-      item._scroll = max > 0 ? clamp(item._scroll, max) : 0;
+      // the offset the wheel asked for outlives a pass at a bigger viewport,
+      // one where everything may even fit, whose clamp would otherwise lose
+      // the end of the list before a later pass in the same layout narrows
+      // the viewport again
+      item._scroll = max > 0 ? clamp(item._scrollWanted != null ? item._scrollWanted : item._scroll, max) : 0;
       scrollEntries(view, entry, item._scroll);
-      if (max > 0) legendScrollEvents(view);
       if (max > 0) {
+        legendScrollEvents(view);
         entry.clip = true;
         entry.width = Math.max(Math.ceil(scope.bounds.x2) + 2 * bar, viewWidth != null ? viewWidth - 2 * pad : 0);
         entry.height = viewHeight;
@@ -20993,7 +21000,7 @@
         const scroll = clamp(legend._scroll + wheelDelta(evt, legend._scrollView), legend._scrollMax);
         if (scroll === legend._scroll) return;
         evt.preventDefault();
-        legend._scroll = scroll;
+        legend._scroll = legend._scrollWanted = scroll;
         const entry = legend.items[0].items[0];
         scrollEntries(view, entry, scroll);
         view.dirty(entry);
@@ -21012,24 +21019,53 @@
     }
 
     /**
-     * Place the scrollbar thumb along the right edge of the entry viewport.
+     * Place the scrollbar thumb along the right edge of the entry viewport, and
+     * the fade over the viewport's last rows while more can be scrolled.
      */
     function legendScrollbarLayout(view, item, entry) {
-      const mark = item.items.find(m => m.role === ScrollbarRole),
-        thumb = mark && mark.items[0];
-      if (!thumb) return;
       const max = item._scrollMax,
         viewHeight = item._scrollView,
         w = item.scrollbarWidth || 0,
-        h = max > 0 ? Math.max(2 * w, Math.round(viewHeight * viewHeight / (viewHeight + max))) : 0;
-      view.dirty(thumb);
-      thumb.width = max > 0 ? w : 0;
-      thumb.height = h;
-      thumb.x = entry.x + entry.width - thumb.width;
-      thumb.y = entry.y + (max > 0 ? Math.round((viewHeight - h) * item._scroll / max) : 0);
-      Marks.rect.bound(thumb.bounds.clear(), thumb);
-      mark.bounds.clear().union(thumb.bounds);
-      view.dirty(thumb);
+        h = max > 0 ? Math.max(2 * w, Math.round(viewHeight * viewHeight / (viewHeight + max))) : 0,
+        thumb = legendPart(item, ScrollbarRole),
+        fade = legendPart(item, ScrollFadeRole);
+      if (thumb) {
+        placeRect(view, thumb, {
+          x: entry.x + entry.width - (max > 0 ? w : 0),
+          y: entry.y + (max > 0 ? Math.round((viewHeight - h) * item._scroll / max) : 0),
+          width: max > 0 ? w : 0,
+          height: h
+        });
+      }
+      if (fade) {
+        const fh = max > 0 && item._scroll < max ? Math.min(FadeHeight, viewHeight) : 0;
+        // an empty rect still has bounds, so it stays inside the entries
+        placeRect(view, fade, {
+          x: entry.x,
+          y: entry.y + (fh ? viewHeight - fh : 0),
+          width: fh ? entry.width : 0,
+          height: fh
+        });
+      }
+    }
+    function legendPart(item, role) {
+      const mark = item.items.find(m => m.role === role);
+      return mark && mark.items[0];
+    }
+    function placeRect(view, rect, {
+      x,
+      y,
+      width,
+      height
+    }) {
+      view.dirty(rect);
+      rect.x = x;
+      rect.y = y;
+      rect.width = width;
+      rect.height = height;
+      Marks.rect.bound(rect.bounds.clear(), rect);
+      rect.mark.bounds.clear().union(rect.bounds);
+      view.dirty(rect);
     }
 
     // utility for looking up legend layout configuration
@@ -21226,16 +21262,19 @@
      * maxHeight among them. Legends without a maxHeight keep their height;
      * the scrollable ones give up viewport in proportion to what they have,
      * down to MinViewHeight, and are laid out again at the reduced budget.
+     * In a top or bottom slot, `span` is the slot's width, and a scrolling
+     * legend widens its viewport to it (see legendRowLayout). In a left or
+     * right slot, `room` is the height beside the plot (see legendSideLayout),
+     * and the budget stays within it.
      */
-    function legendColumnLayout(view, legends, margin) {
+    function legendColumnLayout(view, legends, margin, span, room) {
       const items = legends.map(mark => mark.items[0]),
-        budget = Math.max(...items.map(item => item.maxHeight != null ? item.maxHeight : -Infinity));
-      if (!(budget > 0)) return;
-      const excess = items.reduce((h, item) => h + item.height, margin * (items.length - 1)) - budget;
-      if (excess <= 0) return;
-      const reducible = items.map(item => item.maxHeight != null ? Math.max(0, item.items[0].items[0].bounds.height() - MinViewHeight) : 0);
-      shrink(reducible, excess).forEach((dh, i) => {
-        if (dh > 0) legendLayout(view, legends[i], items[i].height - dh);
+        maxHeight = Math.max(...items.map(item => item.maxHeight != null ? item.maxHeight : -Infinity)),
+        budget = room != null ? Math.min(maxHeight, room) : maxHeight,
+        excess = budget > 0 ? items.reduce((h, item) => h + item.height, margin * (items.length - 1)) - budget : 0,
+        reducible = items.map(item => excess > 0 && item.maxHeight != null ? Math.max(0, item.items[0].items[0].bounds.height() - MinViewHeight) : 0);
+      shrink(reducible, Math.max(0, excess)).forEach((dh, i) => {
+        if (dh > 0) legendLayout(view, legends[i], items[i].height - dh, span);else if (span != null && items[i]._scrollMax > 0) legendLayout(view, legends[i], null, span);
       });
     }
 
@@ -21247,6 +21286,23 @@
     function legendRowLayout(view, legends, span) {
       const item = legends[0].items[0];
       if (legends.length === 1 && item._scrollMax > 0) legendLayout(view, legends[0], null, span);
+    }
+
+    /**
+     * A scrolling legend alone in a left or right slot stays within `room`,
+     * the height beside the plot and its axes from where the legend starts: a
+     * maxHeight taken from the container would run past the plot's bottom
+     * when a top or bottom legend has taken some of that height.
+     */
+    function legendSideLayout(view, legends, room) {
+      const item = legends[0].items[0];
+      if (item.maxHeight != null && item.maxHeight > room) legendLayout(view, legends[0], room);
+    }
+
+    /** The height beside the plot a left or right legend can take, from where it starts. */
+    function legendRoom(params, yb) {
+      const a = params.anchor;
+      return Math.max(MinViewHeight, a.row === End$1 ? a.y - yb.y1 : a.row === Middle$1 ? yb.height() : yb.y2 - a.y);
     }
     function legendBounds(item, b) {
       // aggregate item bounds
@@ -21512,10 +21568,14 @@
         for (const orient in l) {
           const g = l[orient],
             params = legendParams(g, orient, _.legends, xBounds, yBounds, width, height);
+          const span = orient === Top$1 || orient === Bottom$1 ? params.span : null,
+            room = orient === Left$1 || orient === Right$1 ? legendRoom(params, yBounds) : null;
           if (params.columns === 1 && g.length > 1) {
-            legendColumnLayout(view, g.map(item => item.mark), params.padding);
-          } else if (orient === Top$1 || orient === Bottom$1) {
-            legendRowLayout(view, g.map(item => item.mark), params.span);
+            legendColumnLayout(view, g.map(item => item.mark), params.padding, span, room);
+          } else if (span != null) {
+            legendRowLayout(view, g.map(item => item.mark), span);
+          } else if (room != null) {
+            legendSideLayout(view, g.map(item => item.mark), room);
           }
           gridLayout(view, g, params);
         }
@@ -38056,7 +38116,12 @@
       Padding = 'padding',
       Skip$1 = {
         skip: true
-      };
+      },
+      // how many times one autosize can fit again after the layout at the
+      // size it chose asks for another; a legend that wraps to one more row
+      // at the narrower width needs one, and a bound keeps two layouts that
+      // disagree from trading sizes forever
+      MaxAutosizePasses = 3;
     function viewWidth(view, width) {
       var a = view.autosize(),
         p = view.padding();
@@ -38143,8 +38208,15 @@
           view._origin = origin;
         }
 
-        // run dataflow on width/height signal change
-        if (rerun) view.run('enter');
+        // run dataflow on width/height signal change, fitting again if the
+        // layout at the new size asks for yet another
+        if (rerun) {
+          view._autosizePass = (view._autosizePass || 0) + 1;
+          if (view._autosizePass < MaxAutosizePasses) view._autosize = 1;
+          view.run('enter');
+        } else {
+          view._autosizePass = 0;
+        }
         if (auto) view.runAfter(v => v.resize());
       }, false, 1);
     }
@@ -38841,6 +38913,7 @@
     const LegendGradientRole = 'legend-gradient';
     const LegendLabelRole = 'legend-label';
     const LegendScrollbarRole = 'legend-scrollbar';
+    const LegendScrollFadeRole = 'legend-scroll-fade';
     const LegendSymbolRole = 'legend-symbol';
     const LegendTitleRole = 'legend-title';
     const TitleRole = 'title';
@@ -40845,8 +40918,34 @@
         children.push(legendTitle(spec, config, encode.title, dataRef));
       }
 
-      // scrollbar thumb, positioned by layout
+      // fade over the last entries while more can be scrolled, and the
+      // scrollbar thumb; both positioned by layout
       if (scrollable && type === Symbols) {
+        const fade = _('scrollFadeColor');
+        if (fade != null) {
+          const color = isObject(fade) && fade.signal ? fade.signal : stringValue(fade);
+          // the first stop is the fade color at zero alpha, not 'transparent':
+          // a renderer that interpolates unpremultiplied blends black into it
+          const clear = `'rgba(' + rgb(${color}).r + ',' + rgb(${color}).g + ',' + rgb(${color}).b + ',0)'`;
+          children.push(guideMark({
+            type: RectMark,
+            role: LegendScrollFadeRole,
+            from: dataRef,
+            encode: {
+              enter: {
+                width: {
+                  value: 0
+                },
+                height: {
+                  value: 0
+                },
+                fill: {
+                  signal: `{gradient: 'linear', x1: 0, y1: 0, x2: 0, y2: 1, stops: [{offset: 0, color: ${clear}}, {offset: 1, color: ${color}}]}`
+                }
+              }
+            }
+          }));
+        }
         children.push(guideMark({
           type: RectMark,
           role: LegendScrollbarRole,
