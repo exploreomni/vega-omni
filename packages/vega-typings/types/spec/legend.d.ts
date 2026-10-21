@@ -335,7 +335,6 @@ export interface BaseLegend {
    */
   scrollbarColor?: ColorValue;
 
-
   /**
    * The width in pixels of the scrollbar thumb drawn when a symbol legend overflows `maxHeight`.
    *
