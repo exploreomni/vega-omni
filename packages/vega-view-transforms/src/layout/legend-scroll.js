@@ -3,12 +3,10 @@ import {Marks} from 'vega-scenegraph';
 
 const LegendRole = 'legend',
       ScrollbarRole = 'legend-scrollbar',
-      ScrollFadeRole = 'legend-scroll-fade',
       WheelEvent = 'wheel',
       TouchStartEvent = 'touchstart',
       TouchMoveEvent = 'touchmove',
-      LineHeight = 16,
-      FadeHeight = 24;
+      LineHeight = 16;
 
 const clamp = (v, max) => Math.max(0, Math.min(max, v || 0));
 
@@ -156,10 +154,7 @@ function wheelDelta(evt, viewHeight) {
     : evt.deltaY;
 }
 
-/**
- * Place the scrollbar thumb along the right edge of the entry viewport, and
- * the fade over the viewport's last rows while more can be scrolled.
- */
+/** Place the scrollbar thumb along the right edge of the entry viewport. */
 export function legendScrollbarLayout(view, item, entry) {
   const max = item._scrollMax,
         viewHeight = item._scrollView,
@@ -167,8 +162,7 @@ export function legendScrollbarLayout(view, item, entry) {
         h = max > 0
           ? Math.min(viewHeight, Math.max(2 * w, Math.round(viewHeight * viewHeight / (viewHeight + max))))
           : 0,
-        thumb = legendPart(item, ScrollbarRole),
-        fade = legendPart(item, ScrollFadeRole);
+        thumb = legendPart(item, ScrollbarRole);
 
   if (thumb) {
     thumb.cornerRadius = w / 2;
@@ -177,16 +171,6 @@ export function legendScrollbarLayout(view, item, entry) {
       y: entry.y + (max > 0 ? Math.round((viewHeight - h) * item._scroll / max) : 0),
       width: max > 0 ? w : 0,
       height: h
-    });
-  }
-  if (fade) {
-    const fh = max > 0 && item._scroll < max ? Math.min(FadeHeight, viewHeight) : 0;
-    // an empty rect still has bounds, so it stays inside the entries
-    placeRect(view, fade, {
-      x: entry.x,
-      y: entry.y + (fh ? viewHeight - fh : 0),
-      width: fh ? entry.width : 0,
-      height: fh
     });
   }
 }

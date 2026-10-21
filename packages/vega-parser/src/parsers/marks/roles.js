@@ -15,7 +15,6 @@ export const LegendEntryRole = 'legend-entry';
 export const LegendGradientRole = 'legend-gradient';
 export const LegendLabelRole = 'legend-label';
 export const LegendScrollbarRole = 'legend-scrollbar';
-export const LegendScrollFadeRole = 'legend-scroll-fade';
 export const LegendSymbolRole = 'legend-symbol';
 export const LegendTitleRole = 'legend-title';
 

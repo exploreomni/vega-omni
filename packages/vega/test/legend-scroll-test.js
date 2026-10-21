@@ -39,41 +39,26 @@ function part(view, role) {
   return found;
 }
 
-tape('A scroll fade color the canvas cannot parse draws no fade', async t => {
-  const view = await render({scrollFadeColor: 'transparent'});
-  t.equal(part(view, 'legend-scroll-fade').fill, null);
-  await view.toCanvas();
-  t.end();
-});
-
-tape('Scroll colors and width accept value refs', async t => {
+tape('Scrollbar color and width accept value refs', async t => {
   const view = await render({
-    scrollFadeColor: {value: 'white'},
     scrollbarColor: {value: 'red'},
     scrollbarWidth: {value: 6}
   });
   const thumb = part(view, 'legend-scrollbar');
-  t.deepEqual(part(view, 'legend-scroll-fade').fill.stops.map(s => s.color),
-    ['rgba(255,255,255,0)', 'white']);
   t.equal(thumb.fill, 'red');
   t.equal(thumb.width, 6);
   t.equal(thumb.cornerRadius, 3);
   t.end();
 });
 
-tape('Scroll colors and width follow their signals', async t => {
+tape('Scrollbar color and width follow their signals', async t => {
   const view = await render(
-    {
-      scrollFadeColor: {signal: 'fade'},
-      scrollbarColor: {signal: 'bar'},
-      scrollbarWidth: {signal: 'barWidth'}
-    },
-    [{name: 'fade', value: 'white'}, {name: 'bar', value: 'red'}, {name: 'barWidth', value: 4}]
+    {scrollbarColor: {signal: 'bar'}, scrollbarWidth: {signal: 'barWidth'}},
+    [{name: 'bar', value: 'red'}, {name: 'barWidth', value: 4}]
   );
-  await view.signal('fade', 'black').signal('bar', 'blue').signal('barWidth', 8).runAsync();
+  await view.signal('bar', 'blue').signal('barWidth', 8).runAsync();
 
   const thumb = part(view, 'legend-scrollbar');
-  t.equal(part(view, 'legend-scroll-fade').fill.stops[1].color, 'black');
   t.equal(thumb.fill, 'blue');
   t.equal(thumb.width, 8);
   t.equal(thumb.cornerRadius, 4);

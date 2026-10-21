@@ -14,7 +14,7 @@ import legendSymbolGroups, {legendSymbolLayout} from './guides/legend-symbol-gro
 import legendTitle from './guides/legend-title.js';
 import parseMark from './mark.js';
 import {
-  LegendEntryRole, LegendRole, LegendScrollFadeRole, LegendScrollbarRole
+  LegendEntryRole, LegendRole, LegendScrollbarRole
 } from './marks/roles.js';
 
 import {deref, ref} from '../util.js';
@@ -22,7 +22,7 @@ import {Collect, LegendEntries} from '../transforms.js';
 
 import {parseExpression} from 'vega-functions';
 import {isContinuous, isDiscretizing} from 'vega-scale';
-import {error, isObject, stringValue} from 'vega-util';
+import {error} from 'vega-util';
 
 export default function(spec, scope) {
   const config = scope.config.legend,
@@ -126,35 +126,8 @@ export default function(spec, scope) {
     children.push(legendTitle(spec, config, encode.title, dataRef));
   }
 
-  // scroll fade and scrollbar thumb; layout sizes and places both
+  // scrollbar thumb; layout sizes and places it
   if (scrollable) {
-    const fade = _('scrollFadeColor');
-    if (fade != null) {
-      const color = isObject(fade)
-              ? (fade.signal ? `(${fade.signal})` : stringValue(fade.value))
-              : stringValue(fade),
-            rgba = `rgb(${color})`,
-            // the first stop is the fade color at zero alpha, not 'transparent':
-            // a renderer that interpolates unpremultiplied blends black into it
-            clear = `'rgba(' + ${rgba}.r + ',' + ${rgba}.g + ',' + ${rgba}.b + ',0)'`;
-      children.push(guideMark({
-        type: RectMark,
-        role: LegendScrollFadeRole,
-        from: dataRef,
-        encode: {
-          enter: {
-            width: {value: 0},
-            height: {value: 0}
-          },
-          update: {
-            // a color rgb() cannot parse, such as 'transparent', draws no fade
-            fill: {
-              signal: `isFinite(${rgba}.r) ? {gradient: 'linear', x1: 0, y1: 0, x2: 0, y2: 1, stops: [{offset: 0, color: ${clear}}, {offset: 1, color: ${color}}]} : null`
-            }
-          }
-        }
-      }));
-    }
     const thumbEncode = {enter: {width: {value: 0}, height: {value: 0}}, update: {}};
     addEncoders(thumbEncode, {fill: _('scrollbarColor')});
     children.push(guideMark({

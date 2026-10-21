@@ -33,7 +33,6 @@ Properties for specifying a legend. Legends accept one or more [scales](../scale
 | maxHeight     | {% include type t="Number" %}  | The maximum height in pixels of a symbol legend, including padding and title. Entries that do not fit are clipped and can be scrolled with the mouse wheel. |
 | scrollbarColor | {% include type t="Color" %}  | The color of the scrollbar thumb drawn when a symbol legend overflows _maxHeight_ (default `"#888"`). |
 | scrollbarWidth | {% include type t="Number" %} | The width in pixels of the scrollbar thumb drawn when a symbol legend overflows _maxHeight_ (default `4`). |
-| scrollFadeColor | {% include type t="Color" %} | The color a symbol legend's last visible entries fade into while more can be scrolled, usually the background behind the legend. Unset draws no fade. |
 | columnPadding | {% include type t="Number" %}  | The horizontal padding in pixels between symbol legend entries. |
 | rowPadding    | {% include type t="Number" %}  | The vertical padding in pixels between symbol legend entries. |
 | cornerRadius  | {% include type t="Number" %}  | Corner radius for the full legend. |

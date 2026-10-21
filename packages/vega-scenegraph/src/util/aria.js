@@ -26,7 +26,6 @@ const AriaIgnore = toSet([
   'legend-entry',
   'legend-gradient',
   'legend-label',
-  'legend-scroll-fade',
   'legend-scrollbar',
   'legend-title',
   'legend-symbol',

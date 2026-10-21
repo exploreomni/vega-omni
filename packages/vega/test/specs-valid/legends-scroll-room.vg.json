@@ -53,8 +53,7 @@
       "orient": "right",
       "symbolLimit": 0,
       "maxHeight": 400,
-      "scrollbarColor": "gray",
-      "scrollFadeColor": "white"
+      "scrollbarColor": "gray"
     }
   ],
   "marks": [

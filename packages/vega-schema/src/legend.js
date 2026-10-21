@@ -105,7 +105,6 @@ const legendProps = object({
   columns: oneOf(numberType, enums(['auto']), signalRef),
   maxWidth: numberValue,
   maxHeight: numberValue,
-  scrollFadeColor: colorValue,
   scrollbarColor: colorValue,
   scrollbarWidth: numberValue,
   columnPadding: numberOrSignal,
