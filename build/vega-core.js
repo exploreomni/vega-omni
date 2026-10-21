@@ -18663,7 +18663,7 @@
 
     // these roles are covered by related roles
     // we can ignore them, no need to generate attributes
-    const AriaIgnore = toSet(['axis-domain', 'axis-grid', 'axis-label', 'axis-tick', 'axis-title', 'legend-band', 'legend-entry', 'legend-gradient', 'legend-label', 'legend-scroll-fade', 'legend-scrollbar', 'legend-title', 'legend-symbol', 'title']);
+    const AriaIgnore = toSet(['axis-domain', 'axis-grid', 'axis-label', 'axis-tick', 'axis-title', 'legend-band', 'legend-entry', 'legend-gradient', 'legend-label', 'legend-scrollbar', 'legend-title', 'legend-symbol', 'title']);
 
     // aria attribute generators for guide roles
     const AriaGuides = {
@@ -20913,12 +20913,10 @@
     }
     const LegendRole$2 = 'legend',
       ScrollbarRole = 'legend-scrollbar',
-      ScrollFadeRole = 'legend-scroll-fade',
       WheelEvent = 'wheel',
       TouchStartEvent = 'touchstart',
       TouchMoveEvent = 'touchmove',
-      LineHeight = 16,
-      FadeHeight = 24;
+      LineHeight = 16;
     const clamp = (v, max) => Math.max(0, Math.min(max, v || 0));
 
     /**
@@ -21048,17 +21046,13 @@
       return evt.deltaMode === 1 ? evt.deltaY * LineHeight : evt.deltaMode === 2 ? evt.deltaY * viewHeight : evt.deltaY;
     }
 
-    /**
-     * Place the scrollbar thumb along the right edge of the entry viewport, and
-     * the fade over the viewport's last rows while more can be scrolled.
-     */
+    /** Place the scrollbar thumb along the right edge of the entry viewport. */
     function legendScrollbarLayout(view, item, entry) {
       const max = item._scrollMax,
         viewHeight = item._scrollView,
         w = item.scrollbarWidth || 0,
         h = max > 0 ? Math.min(viewHeight, Math.max(2 * w, Math.round(viewHeight * viewHeight / (viewHeight + max)))) : 0,
-        thumb = legendPart(item, ScrollbarRole),
-        fade = legendPart(item, ScrollFadeRole);
+        thumb = legendPart(item, ScrollbarRole);
       if (thumb) {
         thumb.cornerRadius = w / 2;
         placeRect(view, thumb, {
@@ -21066,16 +21060,6 @@
           y: entry.y + (max > 0 ? Math.round((viewHeight - h) * item._scroll / max) : 0),
           width: max > 0 ? w : 0,
           height: h
-        });
-      }
-      if (fade) {
-        const fh = max > 0 && item._scroll < max ? Math.min(FadeHeight, viewHeight) : 0;
-        // an empty rect still has bounds, so it stays inside the entries
-        placeRect(view, fade, {
-          x: entry.x,
-          y: entry.y + (fh ? viewHeight - fh : 0),
-          width: fh ? entry.width : 0,
-          height: fh
         });
       }
     }
@@ -38949,7 +38933,6 @@
     const LegendGradientRole = 'legend-gradient';
     const LegendLabelRole = 'legend-label';
     const LegendScrollbarRole = 'legend-scrollbar';
-    const LegendScrollFadeRole = 'legend-scroll-fade';
     const LegendSymbolRole = 'legend-symbol';
     const LegendTitleRole = 'legend-title';
     const TitleRole = 'title';
@@ -40958,37 +40941,8 @@
         children.push(legendTitle(spec, config, encode.title, dataRef));
       }
 
-      // scroll fade and scrollbar thumb; layout sizes and places both
+      // scrollbar thumb; layout sizes and places it
       if (scrollable) {
-        const fade = _('scrollFadeColor');
-        if (fade != null) {
-          const color = isObject(fade) ? fade.signal ? `(${fade.signal})` : stringValue(fade.value) : stringValue(fade),
-            rgba = `rgb(${color})`,
-            // the first stop is the fade color at zero alpha, not 'transparent':
-            // a renderer that interpolates unpremultiplied blends black into it
-            clear = `'rgba(' + ${rgba}.r + ',' + ${rgba}.g + ',' + ${rgba}.b + ',0)'`;
-          children.push(guideMark({
-            type: RectMark,
-            role: LegendScrollFadeRole,
-            from: dataRef,
-            encode: {
-              enter: {
-                width: {
-                  value: 0
-                },
-                height: {
-                  value: 0
-                }
-              },
-              update: {
-                // a color rgb() cannot parse, such as 'transparent', draws no fade
-                fill: {
-                  signal: `isFinite(${rgba}.r) ? {gradient: 'linear', x1: 0, y1: 0, x2: 0, y2: 1, stops: [{offset: 0, color: ${clear}}, {offset: 1, color: ${color}}]} : null`
-                }
-              }
-            }
-          }));
-        }
         const thumbEncode = {
           enter: {
             width: {
