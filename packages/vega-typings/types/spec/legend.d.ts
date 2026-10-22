@@ -321,7 +321,7 @@ export interface BaseLegend {
   /**
    * The maximum width in pixels of a symbol legend with `columns: "auto"`, including padding.
    */
-  maxWidth?: NumberValue;
+  maxWidth?: number | SignalRef;
 
   /**
    * The maximum height in pixels of a symbol legend, including padding and title. Entries that do not fit are clipped and can be scrolled.

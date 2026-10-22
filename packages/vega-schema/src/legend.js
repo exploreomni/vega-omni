@@ -103,7 +103,7 @@ const legendProps = object({
   // SYMBOL LAYOUT CONFIG
   clipHeight: numberOrSignal,
   columns: oneOf(numberType, enums(['auto']), signalRef),
-  maxWidth: numberValue,
+  maxWidth: numberOrSignal,
   maxHeight: numberValue,
   scrollbarColor: colorValue,
   scrollbarWidth: numberValue,

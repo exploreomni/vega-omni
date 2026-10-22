@@ -1,5 +1,6 @@
 [
   "autosize",
+  "legend-max-width",
   "padding",
   "signal",
   "signal-push",
