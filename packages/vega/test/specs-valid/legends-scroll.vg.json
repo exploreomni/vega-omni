@@ -1,0 +1,73 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Symbol legend entries clipped to maxHeight with a scrollbar thumb.",
+  "width": 200,
+  "height": 150,
+  "padding": 5,
+  "autosize": "pad",
+
+  "data": [
+    {
+      "name": "source",
+      "transform": [{"type": "sequence", "start": 1, "stop": 25, "as": "x"}]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {"data": "source", "field": "x"},
+      "range": "width"
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "range": {"scheme": "category20"},
+      "domain": {"data": "source", "field": "x"}
+    }
+  ],
+
+  "axes": [{"scale": "x", "orient": "bottom"}],
+
+  "legends": [
+    {
+      "fill": "color",
+      "title": "Scrolls",
+      "orient": "right",
+      "symbolLimit": 0,
+      "maxHeight": 100
+    },
+    {
+      "fill": "color",
+      "title": "Wraps and scrolls",
+      "orient": "bottom",
+      "direction": "horizontal",
+      "columns": "auto",
+      "symbolLimit": 0,
+      "maxWidth": 200,
+      "maxHeight": 60
+    },
+    {
+      "fill": "color",
+      "title": "Fits",
+      "orient": "left",
+      "symbolLimit": 5,
+      "maxHeight": 100
+    }
+  ],
+
+  "marks": [
+    {
+      "type": "symbol",
+      "from": {"data": "source"},
+      "encode": {
+        "update": {
+          "x": {"scale": "x", "field": "x"},
+          "y": {"value": 75},
+          "fill": {"scale": "color", "field": "x"}
+        }
+      }
+    }
+  ]
+}

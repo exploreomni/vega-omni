@@ -1,0 +1,76 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Symbol legend labels wrapped at labelLimit instead of truncated.",
+  "width": 200,
+  "height": 120,
+  "padding": 5,
+  "autosize": "pad",
+
+  "data": [
+    {
+      "name": "source",
+      "values": [
+        {"x": 1, "y": 3, "c": "Short"},
+        {"x": 2, "y": 5, "c": "A label that runs on and on"},
+        {"x": 3, "y": 2, "c": "Another fairly long label here"}
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {"data": "source", "field": "x"},
+      "range": "width"
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {"data": "source", "field": "y"},
+      "range": "height"
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "range": {"scheme": "category10"},
+      "domain": {"data": "source", "field": "c"}
+    }
+  ],
+
+  "axes": [
+    {"scale": "x", "orient": "bottom"},
+    {"scale": "y", "orient": "left"}
+  ],
+
+  "legends": [
+    {
+      "fill": "color",
+      "title": "Wrapped",
+      "orient": "right",
+      "labelLimit": 70,
+      "labelWrap": true
+    },
+    {
+      "fill": "color",
+      "title": "Truncated",
+      "orient": "bottom",
+      "direction": "horizontal",
+      "labelLimit": 70
+    }
+  ],
+
+  "marks": [
+    {
+      "type": "symbol",
+      "from": {"data": "source"},
+      "encode": {
+        "update": {
+          "x": {"scale": "x", "field": "x"},
+          "y": {"scale": "y", "field": "y"},
+          "fill": {"scale": "color", "field": "c"}
+        }
+      }
+    }
+  ]
+}

@@ -422,6 +422,11 @@ export interface TextEncodeEntry extends EncodeEntry, AlignProperty, ThetaProper
    */
   lineHeight?: ProductionRule<NumericValueRef>;
   radius?: ProductionRule<NumericValueRef>;
+
+  /**
+   * Whether to break the text at spaces into lines no wider than `limit`, instead of truncating it.
+   */
+  wrap?: ProductionRule<BooleanValueRef>;
 }
 
 export interface TrailEncodeEntry extends EncodeEntry, DefinedProperty {}

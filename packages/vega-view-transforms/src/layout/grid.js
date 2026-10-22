@@ -12,7 +12,7 @@ import {isObject} from 'vega-util';
 const min = (a, b) => Math.floor(Math.min(a, b));
 const max = (a, b) => Math.ceil(Math.max(a, b));
 
-function gridLayoutGroups(group) {
+export function gridLayoutGroups(group) {
   var groups = group.items,
       n = groups.length,
       i = 0, mark, items;
@@ -55,14 +55,14 @@ function bboxFlush(item) {
   return new Bounds().set(0, 0, item.width || 0, item.height || 0);
 }
 
-function bboxFull(item) {
+export function bboxFull(item) {
   const b = item.bounds.clone();
   return b.empty()
     ? b.set(0, 0, 0, 0)
     : b.translate(-(item.x || 0), -(item.y || 0));
 }
 
-function get(opt, key, d) {
+export function get(opt, key, d) {
   const v = isObject(opt) ? opt[key] : opt;
   return v != null ? v : (d !== undefined ? d : 0);
 }

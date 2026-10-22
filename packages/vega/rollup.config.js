@@ -39,16 +39,16 @@ function plugins(targets, conditions) {
       // to vega-canvas.node.js (with nodeCanvas + the canvas package import).
       ...(conditions === 'browser' ? { browser: true } : { exportConditions: conditions }),
       modulesOnly: true,
-      customResolveOptions: { preserveSymlinks: false },
+      customResolveOptions: { preserveSymlinks: false }
     }),
     json(),
     babel({
       presets: [['@babel/preset-env', { targets }]],
       babelHelpers: 'bundled',
       extensions: ['.js', '.ts'],
-      generatorOpts: { importAttributesKeyword: 'with' },
+      generatorOpts: { importAttributesKeyword: 'with' }
     }),
-    bundleSize(),
+    bundleSize()
   ];
 }
 
@@ -67,9 +67,9 @@ export default function (commandLineArgs) {
     output: {
       file: './build/vega.module.js',
       format: 'esm',
-      sourcemap: true,
+      sourcemap: true
     },
-    plugins: plugins('defaults', 'browser'),
+    plugins: plugins('defaults', 'browser')
   };
 
   // Node ESM — for SSR. `canvas` is a native module and must be external.
@@ -80,9 +80,9 @@ export default function (commandLineArgs) {
     output: {
       file: './build/vega.node.module.js',
       format: 'esm',
-      sourcemap: true,
+      sourcemap: true
     },
-    plugins: plugins({ node: true }, ['node', 'default']),
+    plugins: plugins({ node: true }, ['node', 'default'])
   };
 
   if (test) return [esmBrowser, esmNode];
@@ -93,9 +93,9 @@ export default function (commandLineArgs) {
     onwarn,
     output: [
       { file, format: 'umd', name: 'vega', globals, sourcemap: true, plugins: [terser()] },
-      { file: file.replace('.min', ''), format: 'umd', name: 'vega', globals, sourcemap: true },
+      { file: file.replace('.min', ''), format: 'umd', name: 'vega', globals, sourcemap: true }
     ],
-    plugins: plugins('defaults', 'browser'),
+    plugins: plugins('defaults', 'browser')
   });
 
   return [
@@ -104,7 +104,7 @@ export default function (commandLineArgs) {
     umdBundle(pkg.jsdelivr, []),
     umdBundle(
       pkg.jsdelivr.replace('.min.js', '-core.min.js'),
-      trueExternals.filter((d) => d.startsWith('d3') || d.startsWith('topojson')),
-    ),
+      trueExternals.filter((d) => d.startsWith('d3') || d.startsWith('topojson'))
+    )
   ];
 }

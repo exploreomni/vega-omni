@@ -1,6 +1,8 @@
 import {addEncoders, extendEncode} from './encode/util.js';
+import guideMark from './guides/guide-mark.js';
+import {RectMark} from './marks/marktypes.js';
 import {
-  Discrete, Gradient,
+  Auto, Discrete, Gradient,
   GuideLabelStyle, LegendScales, Skip, Symbols
 } from './guides/constants.js';
 import guideGroup from './guides/guide-group.js';
@@ -11,7 +13,9 @@ import legendGradientLabels from './guides/legend-gradient-labels.js';
 import legendSymbolGroups, {legendSymbolLayout} from './guides/legend-symbol-groups.js';
 import legendTitle from './guides/legend-title.js';
 import parseMark from './mark.js';
-import {LegendEntryRole, LegendRole} from './marks/roles.js';
+import {
+  LegendEntryRole, LegendRole, LegendScrollbarRole
+} from './marks/roles.js';
 
 import {deref, ref} from '../util.js';
 import {Collect, LegendEntries} from '../transforms.js';
@@ -39,7 +43,8 @@ export default function(spec, scope) {
   if (!scale) error('Missing valid scale for legend.');
 
   // resolve legend type (symbol, gradient, or discrete gradient)
-  const type = legendType(spec, scope.scaleType(scale));
+  const type = legendType(spec, scope.scaleType(scale)),
+        scrollable = type === Symbols && _('maxHeight') != null;
 
   // single-element data source for legend group
   const datum = {
@@ -52,6 +57,8 @@ export default function(spec, scope) {
 
   // encoding properties for legend entry sub-group
   const entryEncode = {enter: {x: {value: 0}, y: {value: 0}}};
+  // a scrollable entry group is hit-tested so wheel events can find it
+  if (scrollable) entryEncode.enter.fill = {value: 'transparent'};
 
   // data source for legend values
   const entryRef = ref(scope.add(LegendEntries(params = {
@@ -89,8 +96,14 @@ export default function(spec, scope) {
   else {
     // determine legend symbol group layout
     entryLayout = legendSymbolLayout(spec, config);
+    // auto columns are resolved at layout time, which re-runs when maxWidth
+    // changes; encoders only need a non-zero count
+    if (entryLayout.columns === Auto && _('maxWidth') != null) {
+      entryLayout.maxWidth = _('maxWidth');
+    }
+    const columns = entryLayout.columns === Auto ? 1 : deref(entryLayout.columns);
     children = [
-      legendSymbolGroups(spec, config, encode, entryRef, deref(entryLayout.columns))
+      legendSymbolGroups(spec, config, encode, entryRef, columns)
     ];
     // pass symbol size information to legend entry generator
     params.size = sizeExpression(spec, scope, children[0].marks);
@@ -104,13 +117,25 @@ export default function(spec, scope) {
       encode: entryEncode,
       marks: children,
       layout: entryLayout,
-      interactive
+      interactive: interactive || scrollable
     })
   ];
 
   // include legend title if defined
   if (datum.title) {
     children.push(legendTitle(spec, config, encode.title, dataRef));
+  }
+
+  // scrollbar thumb; layout sizes and places it
+  if (scrollable) {
+    const thumbEncode = {enter: {width: {value: 0}, height: {value: 0}}, update: {}};
+    addEncoders(thumbEncode, {fill: _('scrollbarColor')});
+    children.push(guideMark({
+      type: RectMark,
+      role: LegendScrollbarRole,
+      from: dataRef,
+      encode: thumbEncode
+    }));
   }
 
   // parse legend specification
@@ -164,6 +189,9 @@ function buildLegendEncode(_, spec, config) {
     strokeDash:   config.strokeDash,
     x:            _('legendX'),
     y:            _('legendY'),
+    maxWidth:     _('maxWidth'),
+    maxHeight:    _('maxHeight'),
+    scrollbarWidth: _('scrollbarWidth'),
 
     // accessibility support
     format:       spec.format,

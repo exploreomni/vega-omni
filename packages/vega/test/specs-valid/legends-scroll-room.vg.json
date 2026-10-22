@@ -1,0 +1,82 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A right legend with a maxHeight past the plot stays within the height beside the plot and its axis.",
+  "width": 200,
+  "height": 150,
+  "padding": 5,
+  "autosize": "pad",
+  "data": [
+    {
+      "name": "source",
+      "transform": [
+        {
+          "type": "sequence",
+          "start": 1,
+          "stop": 25,
+          "as": "x"
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "data": "source",
+        "field": "x"
+      },
+      "range": "width"
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "range": {
+        "scheme": "category20"
+      },
+      "domain": {
+        "data": "source",
+        "field": "x"
+      }
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom"
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "title": "Scrolls",
+      "orient": "right",
+      "symbolLimit": 0,
+      "maxHeight": 400,
+      "scrollbarColor": "gray"
+    }
+  ],
+  "marks": [
+    {
+      "type": "symbol",
+      "from": {
+        "data": "source"
+      },
+      "encode": {
+        "update": {
+          "x": {
+            "scale": "x",
+            "field": "x"
+          },
+          "y": {
+            "value": 75
+          },
+          "fill": {
+            "scale": "color",
+            "field": "x"
+          }
+        }
+      }
+    }
+  ]
+}

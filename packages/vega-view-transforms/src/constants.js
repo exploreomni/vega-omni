@@ -23,6 +23,7 @@ export const TitleRole = 'title';
 export const FrameRole = 'frame';
 export const ScopeRole = 'scope';
 export const LegendRole = 'legend';
+export const LegendScrollbarRole = 'legend-scrollbar';
 
 export const RowHeader = 'row-header';
 export const RowFooter = 'row-footer';
@@ -42,6 +43,7 @@ export const Pad  = 'pad';
 export const None = 'none';
 
 export const All = 'all';
+export const Auto = 'auto';
 export const Each = 'each';
 export const Flush = 'flush';
 

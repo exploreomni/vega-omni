@@ -57,11 +57,32 @@ function lineArray(_) {
 }
 
 export function textLines(item) {
-  return lineArray(
-    item.lineBreak && item.text && !isArray(item.text)
-      ? item.text.split(item.lineBreak)
-      : item.text
-  );
+  const lines = item.lineBreak && item.text && !isArray(item.text)
+    ? item.text.split(item.lineBreak)
+    : item.text;
+  return lineArray(item.wrap && item.limit > 0 ? wrapLines(item, lines) : lines);
+}
+
+// Break each line at spaces so every line fits under the item's limit, as
+// truncate() requires. A word too wide gets its own line and is truncated.
+function wrapLines(item, lines) {
+  const width = widthGetter(item),
+        limit = +item.limit;
+  return (isArray(lines) ? lines : [lines]).flatMap(line => {
+    const out = [];
+    let current = '';
+    for (const word of (line == null ? '' : line + '').split(' ')) {
+      const next = current ? current + ' ' + word : word;
+      if (current && width(next) >= limit) {
+        out.push(current);
+        current = word;
+      } else {
+        current = next;
+      }
+    }
+    out.push(current);
+    return out;
+  });
 }
 
 export function multiLineOffset(item) {

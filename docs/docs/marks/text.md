@@ -31,6 +31,7 @@ permalink: /docs/marks/text/index.html
 | radius              | {% include type t="Number" %}  | Polar coordinate radial offset in pixels, relative to the origin determined by the _x_ and _y_ properties (default `0`). |
 | text                | {% include type t="String|String[]" %}  | The text to display. This text may be truncated if the rendered length of the text exceeds the _limit_ parameter. For versions {% include tag ver="5.7" %}, a string array specifies multiple lines of text. For versions {% include tag ver="5.10" %}, all text lines are white-space trimmed prior to rendering.|
 | theta               | {% include type t="Number" %}  | Polar coordinate angle in radians, relative to the origin determined by the _x_ and _y_ properties (default `0`). Values for `theta` follow the same convention of `arc` marks: angles are measured in radians, with `0` indicating up or "north". |
+| wrap                | {% include type t="Boolean" %} | Whether to break text at spaces onto further lines so each fits the _limit_, instead of truncating it (default `false`). A word wider than the limit gets its own line and is truncated. |
 
 The _x_ and _y_ properties determine an _anchor point_ for the text. Additional positioning parameters, including _dx_, _dy_, _radius_, and _theta_, are applied relative to this point.
 

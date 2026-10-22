@@ -1,8 +1,12 @@
 import {
-  Bottom, BottomLeft, BottomRight, Bounds, Each, End, Flush, Group, Left,
-  Middle, None, Right, Start, Symbols, Top,
+  All, Auto, Bottom, BottomLeft, BottomRight, Bounds, Column, Each, End,
+  Flush, Group, Left, Middle, None, Right, Start, Symbols, Top,
   TopLeft, TopRight
 } from '../constants.js';
+import {bboxFull, get, gridLayoutGroups} from './grid.js';
+import {
+  MinViewHeight, legendScrollLayout, legendScrollbarLayout, shrink
+} from './legend-scroll.js';
 import {boundStroke, multiLineOffset} from 'vega-scenegraph';
 
 // utility for looking up legend layout configuration
@@ -35,6 +39,7 @@ export function legendParams(g, orient, config, xb, yb, w, h) {
     align:   Each,
     bounds:  _('bounds', Flush),
     columns: _('direction') === 'vertical' ? 1 : g.length,
+    span:    frame === Bounds ? xb.width() : (w || yb.width() + 2 * yb.x1),
     padding: _('margin', 8),
     center:  _('center'),
     nodirty: true
@@ -86,7 +91,64 @@ export function legendParams(g, orient, config, xb, yb, w, h) {
   return p;
 }
 
-export function legendLayout(view, legend) {
+/**
+ * Resolve `columns: "auto"` for a legend entry group: the most columns whose
+ * grid fits the legend's maxWidth, measured as gridLayout will place them.
+ * Entries get row and column in row-major order.
+ */
+export function legendEntryColumns(group, opt) {
+  if (opt.columns !== Auto) return opt;
+
+  const legend = group.mark.group,
+        entries = gridLayoutGroups(group).marks,
+        // a scrollable legend keeps its scrollbar gutter whether or not it overflows
+        gutter = legend.maxHeight != null ? 2 * (legend.scrollbarWidth || 0) : 0,
+        avail = (opt.maxWidth != null ? opt.maxWidth : Infinity)
+          - 2 * (legend.padding || 0) - gutter,
+        columns = fitColumns(entries.map(bboxFull), avail,
+          get(opt.align, Column), get(opt.padding, Column));
+
+  entries.forEach((g, i) => {
+    g.column = i % columns;
+    g.row = Math.floor(i / columns);
+  });
+
+  return {...opt, columns};
+}
+
+export function fitColumns(boxes, avail, align, padding) {
+  const n = boxes.length,
+        widths = boxes.map(b => Math.ceil(b.x2)),
+        insets = boxes.map(b => b.x1 < 0 ? Math.ceil(-b.x1) : 0),
+        wmin = widths.reduce((a, b) => Math.min(a, b), Infinity),
+        wmax = widths.reduce((a, b) => Math.max(a, b), 0);
+
+  // total width of an n-entry grid with ncols columns
+  const width = ncols => {
+    let w = 0, c, i, cw, ci;
+    for (c = 0; c < ncols; ++c) {
+      for (cw = 0, ci = 0, i = c; i < n; i += ncols) {
+        cw = Math.max(cw, widths[i]);
+        ci = Math.max(ci, insets[i]);
+      }
+      w += (align === All ? wmax : cw) + (c ? padding + ci : 0);
+    }
+    return w;
+  };
+
+  // no wider grid fits even if every column were as narrow as the narrowest entry
+  const most = Math.floor((avail + padding) / (wmin + padding));
+  let ncols = most < n ? Math.max(1, most) : n;
+  while (ncols > 1 && width(ncols) > avail) --ncols;
+  return Math.max(1, ncols);
+}
+
+/**
+ * Lay out a legend. A slot's fit may call it again at a `maxHeight` budget
+ * or `viewWidth` (`again`), which keeps the bounds the first call cached:
+ * they are the legend's last rendered location, which ViewLayout dirties.
+ */
+export function legendLayout(view, legend, maxHeight, viewWidth, again) {
   var item = legend.items[0],
       datum = item.datum,
       orient = item.orient,
@@ -94,13 +156,26 @@ export function legendLayout(view, legend) {
       x = item.x, y = item.y, w, h;
 
   // cache current bounds for later comparison
-  item._bounds
-    ? item._bounds.clear().union(bounds)
-    : item._bounds = bounds.clone();
+  if (!again) {
+    item._bounds
+      ? item._bounds.clear().union(bounds)
+      : item._bounds = bounds.clone();
+  }
   bounds.clear();
 
+  const entry = item.items[0].items[0],
+        scroll = datum.type === Symbols && item.maxHeight != null;
+
+  // clip entries to maxHeight before the title is placed against them
+  if (scroll) {
+    legendScrollLayout(view, item, entry,
+      maxHeight != null ? maxHeight : item.maxHeight, viewWidth);
+  }
+
   // adjust legend to accommodate padding and title
-  legendGroupLayout(view, item, item.items[0].items[0]);
+  legendGroupLayout(view, item, entry);
+
+  if (scroll) legendScrollbarLayout(view, item, entry);
 
   // aggregate bounds to determine size, and include origin
   bounds = legendBounds(item, bounds);
@@ -125,6 +200,62 @@ export function legendLayout(view, legend) {
   item.mark.bounds.clear().union(bounds);
 
   return item;
+}
+
+/**
+ * Fit the legends stacked in one orient column within the largest maxHeight
+ * among them. Legends without a maxHeight keep their height; scrollable ones
+ * give up viewport in proportion, down to MinViewHeight, and are laid out
+ * again at the reduced budget. In a top or bottom slot `span` is the slot's
+ * width, which a scrolling legend's viewport widens to (see legendRowLayout);
+ * in a left or right slot `room` caps the budget (see legendSideLayout).
+ */
+export function legendColumnLayout(view, legends, margin, span, room) {
+  const items = legends.map(mark => mark.items[0]),
+        maxHeight = Math.max(...items.map(item => item.maxHeight != null ? item.maxHeight : -Infinity)),
+        budget = room != null ? Math.min(maxHeight, room) : maxHeight,
+        excess = budget > 0
+          ? items.reduce((h, item) => h + item.height, margin * (items.length - 1)) - budget
+          : 0,
+        reducible = items.map(item => excess > 0 && item.maxHeight != null
+          ? Math.max(0, item.items[0].items[0].bounds.height() - MinViewHeight)
+          : 0);
+
+  shrink(reducible, Math.max(0, excess)).forEach((dh, i) => {
+    if (dh > 0) legendLayout(view, legends[i], items[i].height - dh, span, true);
+    else if (span != null && items[i]._scrollMax > 0) legendLayout(view, legends[i], null, span, true);
+  });
+}
+
+/**
+ * A scrolling legend alone in a top or bottom slot widens its viewport to
+ * the slot, so its scrollbar sits at the slot's edge, not against the last
+ * column.
+ */
+export function legendRowLayout(view, legends, span) {
+  const item = legends[0].items[0];
+  if (legends.length === 1 && item._scrollMax > 0) legendLayout(view, legends[0], null, span, true);
+}
+
+/**
+ * The scrolling legends side by side in a left or right slot stay within
+ * `room`, the height beside the plot and its axes from where the legends
+ * start: a maxHeight taken from the container would run past the plot's
+ * bottom once a top or bottom legend has taken some of that height.
+ */
+export function legendSideLayout(view, legends, room) {
+  legends.forEach(legend => {
+    const item = legend.items[0];
+    if (item.maxHeight != null && item.maxHeight > room) legendLayout(view, legend, room, null, true);
+  });
+}
+
+/** The height beside the plot a left or right legend can take, from where it starts. */
+export function legendRoom(params, yb) {
+  const a = params.anchor;
+  return Math.max(MinViewHeight, a.row === End ? a.y - yb.y1
+    : a.row === Middle ? yb.height()
+    : yb.y2 - a.y);
 }
 
 function legendBounds(item, b) {

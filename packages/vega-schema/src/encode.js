@@ -259,6 +259,7 @@ const encodeEntry = object({
   limit: numberValueRef,
   lineBreak: stringValueRef,
   lineHeight: numberValueRef,
+  wrap: booleanValueRef,
   dx: numberValueRef,
   dy: numberValueRef,
   radius:numberValueRef,

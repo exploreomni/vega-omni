@@ -12,6 +12,7 @@ import { LayoutAlign } from './layout.js';
 import {
   AlignValue,
   AnchorValue,
+  BooleanValue,
   ColorValue,
   DashArrayValue,
   FontStyleValue,
@@ -313,8 +314,33 @@ export interface BaseLegend {
 
   /**
    * The number of columns in which to arrange symbol legend entries. A value of `0` or lower indicates a single row with one column per entry.
+   * The value `"auto"` arranges a horizontal legend into as many columns as fit within `maxWidth`; a vertical legend uses a single column.
    */
-  columns?: number | SignalRef;
+  columns?: number | 'auto' | SignalRef;
+
+  /**
+   * The maximum width in pixels of a symbol legend with `columns: "auto"`, including padding.
+   */
+  maxWidth?: number | SignalRef;
+
+  /**
+   * The maximum height in pixels of a symbol legend, including padding and title. Entries that do not fit are clipped and can be scrolled.
+   */
+  maxHeight?: NumberValue;
+
+  /**
+   * The color of the scrollbar thumb drawn when a symbol legend overflows `maxHeight`.
+   *
+   * __Default value:__ `"#888"`.
+   */
+  scrollbarColor?: ColorValue;
+
+  /**
+   * The width in pixels of the scrollbar thumb drawn when a symbol legend overflows `maxHeight`.
+   *
+   * __Default value:__ `4`.
+   */
+  scrollbarWidth?: NumberValue;
 
   /**
    * The horizontal padding in pixels between symbol legend entries.
@@ -441,6 +467,11 @@ export interface BaseLegend {
    * __Default value:__ `160`.
    */
   labelLimit?: NumberValue;
+
+  /**
+   * Whether symbol legend labels wider than `labelLimit` wrap onto further lines instead of being truncated.
+   */
+  labelWrap?: BooleanValue;
 
   /**
    * Opacity of labels.
