@@ -5893,14 +5893,7 @@
               ]
             },
             "maxWidth": {
-              "oneOf": [
-                {
-                  "type": "number"
-                },
-                {
-                  "$ref": "#/definitions/numberValue"
-                }
-              ]
+              "$ref": "#/definitions/numberOrSignal"
             },
             "maxHeight": {
               "oneOf": [

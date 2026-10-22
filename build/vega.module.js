@@ -20092,6 +20092,7 @@ const TitleRole$1 = 'title';
 const FrameRole$1 = 'frame';
 const ScopeRole$1 = 'scope';
 const LegendRole$1 = 'legend';
+const LegendScrollbarRole$1 = 'legend-scrollbar';
 const RowHeader = 'row-header';
 const RowFooter = 'row-footer';
 const RowTitle = 'row-title';
@@ -20905,9 +20906,7 @@ function layoutTitle(view, g, offset, isX, bounds, band) {
   // queue title for redraw
   view.dirty(g);
 }
-const LegendRole$2 = 'legend',
-  ScrollbarRole = 'legend-scrollbar',
-  WheelEvent = 'wheel',
+const WheelEvent = 'wheel',
   TouchStartEvent = 'touchstart',
   TouchMoveEvent = 'touchmove',
   LineHeight = 16;
@@ -21032,7 +21031,7 @@ function scrollLegend(view, legend, delta, evt) {
 }
 function scrollableLegend(item) {
   for (; item; item = item.mark.group) {
-    if (item.mark.role === LegendRole$2) return item._scrollMax > 0 ? item : null;
+    if (item.mark.role === LegendRole$1) return item._scrollMax > 0 ? item : null;
   }
   return null;
 }
@@ -21046,7 +21045,7 @@ function legendScrollbarLayout(view, item, entry) {
     viewHeight = item._scrollView,
     w = item.scrollbarWidth || 0,
     h = max > 0 ? Math.min(viewHeight, Math.max(2 * w, Math.round(viewHeight * viewHeight / (viewHeight + max)))) : 0,
-    thumb = legendPart(item, ScrollbarRole);
+    thumb = legendPart(item, LegendScrollbarRole$1);
   if (thumb) {
     thumb.cornerRadius = w / 2;
     placeRect(view, thumb, {
@@ -21223,7 +21222,13 @@ function fitColumns(boxes, avail, align, padding) {
   while (ncols > 1 && width(ncols) > avail) --ncols;
   return Math.max(1, ncols);
 }
-function legendLayout(view, legend, maxHeight, viewWidth) {
+
+/**
+ * Lay out a legend. A slot's fit may call it again at a `maxHeight` budget
+ * or `viewWidth` (`again`), which keeps the bounds the first call cached:
+ * they are the legend's last rendered location, which ViewLayout dirties.
+ */
+function legendLayout(view, legend, maxHeight, viewWidth, again) {
   var item = legend.items[0],
     datum = item.datum,
     orient = item.orient,
@@ -21234,7 +21239,9 @@ function legendLayout(view, legend, maxHeight, viewWidth) {
     h;
 
   // cache current bounds for later comparison
-  item._bounds ? item._bounds.clear().union(bounds) : item._bounds = bounds.clone();
+  if (!again) {
+    item._bounds ? item._bounds.clear().union(bounds) : item._bounds = bounds.clone();
+  }
   bounds.clear();
   const entry = item.items[0].items[0],
     scroll = datum.type === Symbols$1 && item.maxHeight != null;
@@ -21285,7 +21292,7 @@ function legendColumnLayout(view, legends, margin, span, room) {
     excess = budget > 0 ? items.reduce((h, item) => h + item.height, margin * (items.length - 1)) - budget : 0,
     reducible = items.map(item => excess > 0 && item.maxHeight != null ? Math.max(0, item.items[0].items[0].bounds.height() - MinViewHeight) : 0);
   shrink(reducible, Math.max(0, excess)).forEach((dh, i) => {
-    if (dh > 0) legendLayout(view, legends[i], items[i].height - dh, span);else if (span != null && items[i]._scrollMax > 0) legendLayout(view, legends[i], null, span);
+    if (dh > 0) legendLayout(view, legends[i], items[i].height - dh, span, true);else if (span != null && items[i]._scrollMax > 0) legendLayout(view, legends[i], null, span, true);
   });
 }
 
@@ -21296,18 +21303,20 @@ function legendColumnLayout(view, legends, margin, span, room) {
  */
 function legendRowLayout(view, legends, span) {
   const item = legends[0].items[0];
-  if (legends.length === 1 && item._scrollMax > 0) legendLayout(view, legends[0], null, span);
+  if (legends.length === 1 && item._scrollMax > 0) legendLayout(view, legends[0], null, span, true);
 }
 
 /**
- * A scrolling legend alone in a left or right slot stays within `room`, the
- * height beside the plot and its axes from where the legend starts: a
- * maxHeight taken from the container would run past the plot's bottom once
- * a top or bottom legend has taken some of that height.
+ * The scrolling legends side by side in a left or right slot stay within
+ * `room`, the height beside the plot and its axes from where the legends
+ * start: a maxHeight taken from the container would run past the plot's
+ * bottom once a top or bottom legend has taken some of that height.
  */
 function legendSideLayout(view, legends, room) {
-  const item = legends[0].items[0];
-  if (item.maxHeight != null && item.maxHeight > room) legendLayout(view, legends[0], room);
+  legends.forEach(legend => {
+    const item = legend.items[0];
+    if (item.maxHeight != null && item.maxHeight > room) legendLayout(view, legend, room, null, true);
+  });
 }
 
 /** The height beside the plot a left or right legend can take, from where it starts. */
