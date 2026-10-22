@@ -238,14 +238,16 @@ export function legendRowLayout(view, legends, span) {
 }
 
 /**
- * A scrolling legend alone in a left or right slot stays within `room`, the
- * height beside the plot and its axes from where the legend starts: a
- * maxHeight taken from the container would run past the plot's bottom once
- * a top or bottom legend has taken some of that height.
+ * The scrolling legends side by side in a left or right slot stay within
+ * `room`, the height beside the plot and its axes from where the legends
+ * start: a maxHeight taken from the container would run past the plot's
+ * bottom once a top or bottom legend has taken some of that height.
  */
 export function legendSideLayout(view, legends, room) {
-  const item = legends[0].items[0];
-  if (item.maxHeight != null && item.maxHeight > room) legendLayout(view, legends[0], room, null, true);
+  legends.forEach(legend => {
+    const item = legend.items[0];
+    if (item.maxHeight != null && item.maxHeight > room) legendLayout(view, legend, room, null, true);
+  });
 }
 
 /** The height beside the plot a left or right legend can take, from where it starts. */

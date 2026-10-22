@@ -105,3 +105,26 @@ tape('A legend laid out again by its slot keeps its last location for dirtying',
   t.notOk(legend.bounds.equals(before), 'and the legend moved');
   t.end();
 });
+
+tape('Side legends laid out side by side each stay within the room beside the plot', async t => {
+  const view = new vega.View(vega.parse({
+    width: 200, height: 150, autosize: 'pad',
+    config: {legend: {layout: {right: {direction: 'horizontal'}}}},
+    data: [{name: 'source', transform: [{type: 'sequence', start: 1, stop: 26, as: 'x'}]}],
+    scales: [
+      {name: 'color', type: 'ordinal', range: {scheme: 'category20'}, domain: {data: 'source', field: 'x'}},
+      {name: 'shape', type: 'ordinal', range: 'symbol', domain: {data: 'source', field: 'x'}}
+    ],
+    legends: [
+      {fill: 'color', orient: 'right', symbolLimit: 0, maxHeight: 400},
+      {shape: 'shape', orient: 'right', symbolLimit: 0, maxHeight: 400}
+    ]
+  }), {renderer: 'none'});
+  await view.runAsync();
+
+  const legends = view.scenegraph().root.items[0].items
+    .filter(m => m.role === 'legend').map(m => m.items[0]);
+  t.equal(legends.length, 2);
+  legends.forEach((legend, i) => t.ok(legend.height <= 150, `legend ${i} fits the 150 beside the plot: ${legend.height}`));
+  t.end();
+});
