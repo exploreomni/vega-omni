@@ -1,9 +1,7 @@
-import {Left, Right} from '../constants.js';
+import {Left, LegendRole, LegendScrollbarRole, Right} from '../constants.js';
 import {Marks} from 'vega-scenegraph';
 
-const LegendRole = 'legend',
-      ScrollbarRole = 'legend-scrollbar',
-      WheelEvent = 'wheel',
+const WheelEvent = 'wheel',
       TouchStartEvent = 'touchstart',
       TouchMoveEvent = 'touchmove',
       LineHeight = 16;
@@ -162,7 +160,7 @@ export function legendScrollbarLayout(view, item, entry) {
         h = max > 0
           ? Math.min(viewHeight, Math.max(2 * w, Math.round(viewHeight * viewHeight / (viewHeight + max))))
           : 0,
-        thumb = legendPart(item, ScrollbarRole);
+        thumb = legendPart(item, LegendScrollbarRole);
 
   if (thumb) {
     thumb.cornerRadius = w / 2;
