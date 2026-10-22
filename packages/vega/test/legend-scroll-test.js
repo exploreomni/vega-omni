@@ -79,3 +79,29 @@ tape('A gradient legend with maxHeight leaves its entries alone', async t => {
   t.equal(entry.fill, undefined);
   t.end();
 });
+
+tape('A legend laid out again by its slot keeps its last location for dirtying', async t => {
+  // two stacked right legends share maxHeight, so the column fit lays the
+  // scrolling one out a second time in the same pass
+  const view = new vega.View(vega.parse({
+    width: 200, height: 150, autosize: 'pad',
+    signals: [{name: 'offset', value: 0}],
+    data: [{name: 'source', transform: [{type: 'sequence', start: 1, stop: 26, as: 'x'}]}],
+    scales: [
+      {name: 'color', type: 'ordinal', range: {scheme: 'category20'}, domain: {data: 'source', field: 'x'}},
+      {name: 'size', type: 'ordinal', range: [20, 40, 60], domain: [1, 2, 3]}
+    ],
+    legends: [
+      {fill: 'color', orient: 'right', symbolLimit: 0, maxHeight: 100, offset: {signal: 'offset'}},
+      {size: 'size', orient: 'right', maxHeight: 100, offset: {signal: 'offset'}}
+    ]
+  }), {renderer: 'none'});
+  await view.runAsync();
+  const legend = part(view, 'legend'),
+        before = legend.bounds.clone();
+
+  await view.signal('offset', 30).runAsync();
+  t.ok(legend._bounds.equals(before), 'the cached bounds are where the legend was');
+  t.notOk(legend.bounds.equals(before), 'and the legend moved');
+  t.end();
+});

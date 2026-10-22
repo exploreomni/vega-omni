@@ -143,7 +143,12 @@ export function fitColumns(boxes, avail, align, padding) {
   return Math.max(1, ncols);
 }
 
-export function legendLayout(view, legend, maxHeight, viewWidth) {
+/**
+ * Lay out a legend. A slot's fit may call it again at a `maxHeight` budget
+ * or `viewWidth` (`again`), which keeps the bounds the first call cached:
+ * they are the legend's last rendered location, which ViewLayout dirties.
+ */
+export function legendLayout(view, legend, maxHeight, viewWidth, again) {
   var item = legend.items[0],
       datum = item.datum,
       orient = item.orient,
@@ -151,9 +156,11 @@ export function legendLayout(view, legend, maxHeight, viewWidth) {
       x = item.x, y = item.y, w, h;
 
   // cache current bounds for later comparison
-  item._bounds
-    ? item._bounds.clear().union(bounds)
-    : item._bounds = bounds.clone();
+  if (!again) {
+    item._bounds
+      ? item._bounds.clear().union(bounds)
+      : item._bounds = bounds.clone();
+  }
   bounds.clear();
 
   const entry = item.items[0].items[0],
@@ -215,8 +222,8 @@ export function legendColumnLayout(view, legends, margin, span, room) {
           : 0);
 
   shrink(reducible, Math.max(0, excess)).forEach((dh, i) => {
-    if (dh > 0) legendLayout(view, legends[i], items[i].height - dh, span);
-    else if (span != null && items[i]._scrollMax > 0) legendLayout(view, legends[i], null, span);
+    if (dh > 0) legendLayout(view, legends[i], items[i].height - dh, span, true);
+    else if (span != null && items[i]._scrollMax > 0) legendLayout(view, legends[i], null, span, true);
   });
 }
 
@@ -227,7 +234,7 @@ export function legendColumnLayout(view, legends, margin, span, room) {
  */
 export function legendRowLayout(view, legends, span) {
   const item = legends[0].items[0];
-  if (legends.length === 1 && item._scrollMax > 0) legendLayout(view, legends[0], null, span);
+  if (legends.length === 1 && item._scrollMax > 0) legendLayout(view, legends[0], null, span, true);
 }
 
 /**
@@ -238,7 +245,7 @@ export function legendRowLayout(view, legends, span) {
  */
 export function legendSideLayout(view, legends, room) {
   const item = legends[0].items[0];
-  if (item.maxHeight != null && item.maxHeight > room) legendLayout(view, legends[0], room);
+  if (item.maxHeight != null && item.maxHeight > room) legendLayout(view, legends[0], room, null, true);
 }
 
 /** The height beside the plot a left or right legend can take, from where it starts. */
