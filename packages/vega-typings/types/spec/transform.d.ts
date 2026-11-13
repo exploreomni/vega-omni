@@ -523,6 +523,7 @@ export interface LabelTransform {
   avoidBaseMark?: boolean | SignalRef;
   avoidMarks?: string[];
   method?: AreaLabelMethod;
+  overlap?: boolean | SignalRef;
   as?: Vector7<string | SignalRef> | SignalRef;
 }
 

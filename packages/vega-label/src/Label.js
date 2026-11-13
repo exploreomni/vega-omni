@@ -45,6 +45,9 @@ const Anchors = [
  *   overlap with the underlying base mark being labeled.
  * @param {string} [params.method='naive'] - For area make labels only, a method for
  *   place labels. One of 'naive', 'reduced-search', or 'floodfill'.
+ * @param {boolean} [params.overlap=false] - Boolean flag indicating if every label should be
+ *   placed, whatever it overlaps. Anchors are then tested only against the layout bounds, and
+ *   a label that fits at none takes the first. Does not apply to group area marks.
  * @param {Array<string>} [params.as] - The output fields written by the transform.
  *   The default is ['x', 'y', 'opacity', 'align', 'baseline'].
  */
@@ -66,6 +69,7 @@ Label.Definition = {
     { name: 'avoidBaseMark', type: 'boolean', default: true },
     { name: 'avoidMarks', type: 'data', array: true },
     { name: 'method', type: 'string', default: 'naive'},
+    { name: 'overlap', type: 'boolean', default: false },
     { name: 'as', type: 'string', array: true, length: Output.length, default: Output }
   ]
 };
@@ -97,7 +101,8 @@ inherits(Label, Transform, {
       _.lineAnchor || 'end',
       _.markIndex || 0,
       _.padding === undefined ? 0 : _.padding,
-      _.method || 'naive'
+      _.method || 'naive',
+      !!_.overlap
     ).forEach(l => {
       // write layout results to data stream
       const t = l.datum;

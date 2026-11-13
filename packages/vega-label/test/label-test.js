@@ -436,3 +436,111 @@ tape('Label performs label layout over input multiple points outside of chart\'s
 
   t.end();
 });
+
+tape('Label places every label when overlap is allowed', t => {
+  function data() {
+    return [
+      {text: 'foo', x: 20, y: 15, fontSize: 10},
+      {text: 'bar', x: 22, y: 15, fontSize: 10}
+    ];
+  }
+
+  const df = new Dataflow(),
+        ov = df.add(false),
+        c0 = df.add(Collect),
+        lb = df.add(Label, {
+          size: [50, 30],
+          anchor: ['top'],
+          offset: [2],
+          overlap: ov,
+          pulse: c0
+        });
+
+  df.pulse(c0, changeset().insert(data())).run();
+  t.equal(lb.stamp, df.stamp());
+  let out = c0.value;
+  t.equal(out[0].opacity, 1);
+  t.equal(out[1].opacity, 0);
+
+  df.update(ov, true)
+    .pulse(c0, changeset().remove(truthy).insert(data()))
+    .run();
+  out = c0.value;
+  closeTo(t, out[0].x, 20);
+  closeTo(t, out[0].y, 13);
+  t.equal(out[0].opacity, 1);
+  closeTo(t, out[1].x, 22);
+  closeTo(t, out[1].y, 13);
+  t.equal(out[1].align, 'center');
+  t.equal(out[1].baseline, 'bottom');
+  t.equal(out[1].opacity, 1);
+
+  t.end();
+});
+
+tape('Label with overlap keeps labels in bounds where an anchor allows', t => {
+  function data() {
+    return [
+      {text: 'edge', x: 1, y: 15, fontSize: 10},
+      {text: 'a-label-wider-than-the-chart', x: 25, y: 15, fontSize: 10}
+    ];
+  }
+
+  const df = new Dataflow(),
+        c0 = df.add(Collect);
+
+  df.add(Label, {
+    size: [50, 30],
+    anchor: ['left', 'right'],
+    offset: [2],
+    overlap: true,
+    pulse: c0
+  });
+
+  df.pulse(c0, changeset().insert(data())).run();
+  const out = c0.value;
+
+  // 'left' would leave the chart, so the label takes 'right'
+  closeTo(t, out[0].x, 3);
+  t.equal(out[0].align, 'left');
+  t.equal(out[0].opacity, 1);
+
+  // no anchor fits, so the label takes the first
+  closeTo(t, out[1].x, 23);
+  t.equal(out[1].align, 'right');
+  t.equal(out[1].opacity, 1);
+
+  t.end();
+});
+
+tape('Label with overlap ignores the base mark and still hides off-chart marks', t => {
+  function item(x) {
+    return {
+      text: 'foo', fontSize: 10,
+      datum: {
+        x, y: 5, width: 20, height: 20, fill: 'black',
+        bounds: new Bounds().set(x, 5, x + 20, 25),
+        mark: {marktype: 'rect'}
+      }
+    };
+  }
+
+  const df = new Dataflow(),
+        c0 = df.add(Collect);
+
+  df.add(Label, {
+    size: [50, 30],
+    anchor: ['top'],
+    offset: [-2],
+    overlap: true,
+    pulse: c0
+  });
+
+  df.pulse(c0, changeset().insert([item(10), item(15), item(60)])).run();
+  const out = c0.value;
+  t.equal(out[0].opacity, 1);
+  t.equal(out[1].opacity, 1);
+  t.equal(out[2].opacity, 0);
+
+  t.end();
+});
