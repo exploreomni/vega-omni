@@ -584,3 +584,33 @@ tape('Label mirrors the anchors of items the mirror predicate selects', t => {
 
   t.end();
 });
+
+tape('Label gives an item with no text no space', t => {
+  function data() {
+    return [
+      {text: '', x: 20, y: 15, fontSize: 10},
+      {text: 'bar', x: 22, y: 15, fontSize: 10}
+    ];
+  }
+
+  const df = new Dataflow(),
+        c0 = df.add(Collect);
+
+  df.add(Label, {
+    size: [50, 30],
+    anchor: ['top'],
+    offset: [2],
+    pulse: c0
+  });
+
+  df.pulse(c0, changeset().insert(data())).run();
+  const out = c0.value;
+
+  // placed first, the empty label would otherwise claim the space above it
+  t.equal(out[0].opacity, 0);
+  closeTo(t, out[1].x, 22);
+  closeTo(t, out[1].y, 13);
+  t.equal(out[1].opacity, 1);
+
+  t.end();
+});

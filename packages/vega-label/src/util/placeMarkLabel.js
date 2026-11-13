@@ -16,6 +16,11 @@ export default function($, bitmaps, anchors, offsets, overlap) {
     const boundary = d.boundary,
           textHeight = d.datum.fontSize;
 
+    // an item with no text has nothing to place, and takes no space
+    if (d.datum.text == null || d.datum.text === '') {
+      return false;
+    }
+
     // can not be placed if the mark is not visible in the graph bound
     if (boundary[2] < 0 || boundary[5] < 0 || boundary[0] > width || boundary[3] > height) {
       return false;

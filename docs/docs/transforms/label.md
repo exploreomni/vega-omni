@@ -4,7 +4,7 @@ title: Label Transform
 permalink: /docs/transforms/label/index.html
 ---
 
-The **label** transform {% include tag ver="5.16" %} positions text marks so that they do not overlap with each other or with other marks in the chart. The label transform should be applied to a [`text` mark](../../marks/text) whose input data is the *base mark* to label. That is, the `text` mark labels should derive from another mark through [reactive geometry](../../marks/#reactivegeom). To label individual line or area marks (rather than each point they contain), the base mark should be a [`group` mark](../../marks/group) containing lines or areas to label.
+The **label** transform {% include tag ver="5.16" %} positions text marks so that they do not overlap with each other or with other marks in the chart. The label transform should be applied to a [`text` mark](../../marks/text) whose input data is the *base mark* to label. A text item with no text is not placed and takes no space. That is, the `text` mark labels should derive from another mark through [reactive geometry](../../marks/#reactivegeom). To label individual line or area marks (rather than each point they contain), the base mark should be a [`group` mark](../../marks/group) containing lines or areas to label.
 
 ## Transform Parameters
 
