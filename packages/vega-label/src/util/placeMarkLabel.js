@@ -32,6 +32,10 @@ export default function($, bitmaps, anchors, offsets, overlap) {
       i = force ? 0 : k;
       dx = (anchors[i] & 0x3) - 1;
       dy = ((anchors[i] >>> 0x2) & 0x3) - 1;
+      if (d.mirror) {
+        dx = -dx;
+        dy = -dy;
+      }
 
       isInside = (dx === 0 && dy === 0) || offsets[i] < 0;
       sizeFactor = dx && dy ? Math.SQRT1_2 : 1;

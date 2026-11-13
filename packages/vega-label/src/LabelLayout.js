@@ -34,7 +34,7 @@ const placeAreaLabel = {
 };
 
 export default function(texts, size, compare, offset, anchor,
-  avoidMarks, avoidBaseMark, lineAnchor, markIndex, padding, method, overlap)
+  avoidMarks, avoidBaseMark, lineAnchor, markIndex, padding, method, overlap, mirror)
 {
   // early exit for empty data
   if (!texts.length) return texts;
@@ -67,6 +67,7 @@ export default function(texts, size, compare, offset, anchor,
       align: undefined,
       baseline: undefined,
       boundary: boundary(d),
+      mirror: !!(mirror && mirror(d)),
       textWidth
     };
   });

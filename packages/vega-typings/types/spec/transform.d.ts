@@ -524,6 +524,7 @@ export interface LabelTransform {
   avoidMarks?: string[];
   method?: AreaLabelMethod;
   overlap?: boolean | SignalRef;
+  mirror?: ExprString;
   as?: Vector7<string | SignalRef> | SignalRef;
 }
 

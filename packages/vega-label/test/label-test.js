@@ -544,3 +544,43 @@ tape('Label with overlap ignores the base mark and still hides off-chart marks',
 
   t.end();
 });
+
+tape('Label mirrors the anchors of items the mirror predicate selects', t => {
+  function item(x, v) {
+    return {
+      text: 'foo', fontSize: 10,
+      datum: {
+        x, y: 15, width: 10, height: 10, fill: 'black',
+        bounds: new Bounds().set(x, 15, x + 10, 25),
+        mark: {marktype: 'rect'},
+        datum: {v}
+      }
+    };
+  }
+
+  const df = new Dataflow(),
+        c0 = df.add(Collect);
+
+  df.add(Label, {
+    size: [60, 40],
+    anchor: ['top'],
+    offset: [2],
+    mirror: d => d.datum.datum.v < 0,
+    pulse: c0
+  });
+
+  df.pulse(c0, changeset().insert([item(10, 1), item(40, -1)])).run();
+  const out = c0.value;
+
+  closeTo(t, out[0].x, 15);
+  closeTo(t, out[0].y, 13);
+  t.equal(out[0].baseline, 'bottom');
+  t.equal(out[0].opacity, 1);
+
+  closeTo(t, out[1].x, 45);
+  closeTo(t, out[1].y, 27);
+  t.equal(out[1].baseline, 'top');
+  t.equal(out[1].opacity, 1);
+
+  t.end();
+});

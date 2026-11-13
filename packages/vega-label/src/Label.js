@@ -48,6 +48,9 @@ const Anchors = [
  * @param {boolean} [params.overlap=false] - Boolean flag indicating if every label should be
  *   placed, whatever it overlaps. Anchors are then tested only against the layout bounds, and
  *   a label that fits at none takes the first. Does not apply to group area marks.
+ * @param {function(object): *} [params.mirror] - An optional predicate expression function over
+ *   the text mark item. Where it is truthy the label's anchors are mirrored through the center of
+ *   its base mark, so 'top' becomes 'bottom'.
  * @param {Array<string>} [params.as] - The output fields written by the transform.
  *   The default is ['x', 'y', 'opacity', 'align', 'baseline'].
  */
@@ -70,6 +73,7 @@ Label.Definition = {
     { name: 'avoidMarks', type: 'data', array: true },
     { name: 'method', type: 'string', default: 'naive'},
     { name: 'overlap', type: 'boolean', default: false },
+    { name: 'mirror', type: 'expr' },
     { name: 'as', type: 'string', array: true, length: Output.length, default: Output }
   ]
 };
@@ -82,7 +86,7 @@ inherits(Label, Transform, {
     }
 
     const mod = _.modified();
-    if (!(mod || pulse.changed(pulse.ADD_REM) || modp('sort'))) return;
+    if (!(mod || pulse.changed(pulse.ADD_REM) || modp('sort') || modp('mirror'))) return;
     if (!_.size || _.size.length !== 2) {
       error('Size parameter should be specified as a [width, height] array.');
     }
@@ -102,7 +106,8 @@ inherits(Label, Transform, {
       _.markIndex || 0,
       _.padding === undefined ? 0 : _.padding,
       _.method || 'naive',
-      !!_.overlap
+      !!_.overlap,
+      _.mirror && (d => _.mirror(d, _))
     ).forEach(l => {
       // write layout results to data stream
       const t = l.datum;
