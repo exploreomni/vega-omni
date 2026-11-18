@@ -13241,6 +13241,19 @@
           ],
           "default": "naive"
         },
+        "overlap": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/definitions/signalRef"
+            }
+          ]
+        },
+        "mirror": {
+          "$ref": "#/definitions/exprString"
+        },
         "as": {
           "oneOf": [
             {

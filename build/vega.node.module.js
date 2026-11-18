@@ -30566,21 +30566,30 @@ function placeAreaLabelFloodFill($, bitmaps, avoidBaseMark, markIndex) {
 }
 const Aligns = ['right', 'center', 'left'],
   Baselines = ['bottom', 'middle', 'top'];
-function placeMarkLabel($, bitmaps, anchors, offsets) {
+function placeMarkLabel($, bitmaps, anchors, offsets, overlap) {
   const width = $.width,
     height = $.height,
     bm0 = bitmaps[0],
     bm1 = bitmaps[1],
-    n = offsets.length;
+    n = offsets.length,
+    // labels allowed to overlap get a last pass that takes the first anchor
+    m = overlap ? n + 1 : n;
   return function (d) {
     const boundary = d.boundary,
       textHeight = d.datum.fontSize;
+
+    // an item with no text has nothing to place, and takes no space
+    if (d.datum.text == null || d.datum.text === '') {
+      return false;
+    }
 
     // can not be placed if the mark is not visible in the graph bound
     if (boundary[2] < 0 || boundary[5] < 0 || boundary[0] > width || boundary[3] > height) {
       return false;
     }
     let textWidth = d.textWidth ?? 0,
+      i,
+      force,
       dx,
       dy,
       isInside,
@@ -30598,9 +30607,15 @@ function placeMarkLabel($, bitmaps, anchors, offsets) {
       _y2;
 
     // for each anchor and offset
-    for (let i = 0; i < n; ++i) {
+    for (let k = 0; k < m; ++k) {
+      force = k === n;
+      i = force ? 0 : k;
       dx = (anchors[i] & 0x3) - 1;
       dy = (anchors[i] >>> 0x2 & 0x3) - 1;
+      if (d.mirror) {
+        dx = -dx;
+        dy = -dy;
+      }
       isInside = dx === 0 && dy === 0 || offsets[i] < 0;
       sizeFactor = dx && dy ? Math.SQRT1_2 : 1;
       insideFactor = offsets[i] < 0 ? -1 : 1;
@@ -30613,7 +30628,7 @@ function placeMarkLabel($, bitmaps, anchors, offsets) {
       _y2 = $(y2);
       if (!textWidth) {
         // to avoid finding width of text label,
-        if (!test(_x1, _x1, _y1, _y2, bm0, bm1, x1, x1, y1, y2, boundary, isInside)) {
+        if (!force && !test(_x1, _x1, _y1, _y2, bm0, bm1, x1, x1, y1, y2, boundary, isInside, overlap)) {
           // skip this anchor/offset option if we fail to place a label with 1px width
           continue;
         } else {
@@ -30626,13 +30641,13 @@ function placeMarkLabel($, bitmaps, anchors, offsets) {
       x2 = xc + textWidth / 2;
       _x1 = $(x1);
       _x2 = $(x2);
-      if (test(_x1, _x2, _y1, _y2, bm0, bm1, x1, x2, y1, y2, boundary, isInside)) {
+      if (force || test(_x1, _x2, _y1, _y2, bm0, bm1, x1, x2, y1, y2, boundary, isInside, overlap)) {
         // place label if the position is placeable
         d.x = !dx ? xc : dx * insideFactor < 0 ? x2 : x1;
         d.y = !dy ? yc : dy * insideFactor < 0 ? y2 : y1;
         d.align = Aligns[dx * insideFactor + 1];
         d.baseline = Baselines[dy * insideFactor + 1];
-        bm0.setRange(_x1, _y1, _x2, _y2);
+        if (!overlap) bm0.setRange(_x1, _y1, _x2, _y2);
         return true;
       }
     }
@@ -30640,9 +30655,10 @@ function placeMarkLabel($, bitmaps, anchors, offsets) {
   };
 }
 
-// Test if a label with the given dimensions can be added without overlap
-function test(_x1, _x2, _y1, _y2, bm0, bm1, x1, x2, y1, y2, boundary, isInside) {
-  return !(bm0.outOfBounds(_x1, _y1, _x2, _y2) || (isInside && bm1 || bm0).getRange(_x1, _y1, _x2, _y2));
+// Test if a label with the given dimensions can be added without overlap.
+// A label allowed to overlap need only stay in bounds.
+function test(_x1, _x2, _y1, _y2, bm0, bm1, x1, x2, y1, y2, boundary, isInside, overlap) {
+  return !(bm0.outOfBounds(_x1, _y1, _x2, _y2) || !overlap && (isInside && bm1 || bm0).getRange(_x1, _y1, _x2, _y2));
 }
 
 // 8-bit representation of anchors
@@ -30670,7 +30686,7 @@ const placeAreaLabel = {
   'reduced-search': placeAreaLabelReducedSearch,
   'floodfill': placeAreaLabelFloodFill
 };
-function labelLayout(texts, size, compare, offset, anchor, avoidMarks, avoidBaseMark, lineAnchor, markIndex, padding, method) {
+function labelLayout(texts, size, compare, offset, anchor, avoidMarks, avoidBaseMark, lineAnchor, markIndex, padding, method, overlap, mirror) {
   // early exit for empty data
   if (!texts.length) return texts;
   const positions = Math.max(offset.length, anchor.length),
@@ -30681,7 +30697,8 @@ function labelLayout(texts, size, compare, offset, anchor, avoidMarks, avoidBase
     isGroupArea = grouptype === 'area',
     boundary = markBoundary(marktype, grouptype, lineAnchor, markIndex),
     infPadding = padding === null || padding === Infinity,
-    isNaiveGroupArea = isGroupArea && method === 'naive';
+    isNaiveGroupArea = isGroupArea && method === 'naive',
+    allowOverlap = overlap && !isGroupArea;
   let maxTextWidth = -1,
     maxTextHeight = -1;
 
@@ -30698,6 +30715,7 @@ function labelLayout(texts, size, compare, offset, anchor, avoidMarks, avoidBase
       align: undefined,
       baseline: undefined,
       boundary: boundary(d),
+      mirror: !!(mirror && mirror(d)),
       textWidth
     };
   });
@@ -30723,11 +30741,12 @@ function labelLayout(texts, size, compare, offset, anchor, avoidMarks, avoidBase
     const baseMark = (marktype && avoidBaseMark || isGroupArea) && texts.map(d => d.datum);
 
     // generate bitmaps for layout calculation
-    bitmaps = avoidMarks.length || baseMark ? markBitmaps($, baseMark || [], avoidMarks, labelInside, isGroupArea) : baseBitmaps($, avoidBaseMark && data);
+    // overlapping labels test the layout bounds only, so nothing is drawn
+    bitmaps = allowOverlap ? baseBitmaps($) : avoidMarks.length || baseMark ? markBitmaps($, baseMark || [], avoidMarks, labelInside, isGroupArea) : baseBitmaps($, avoidBaseMark && data);
   }
 
   // generate label placement function
-  const place = isGroupArea ? placeAreaLabel[method]($, bitmaps, avoidBaseMark, markIndex) : placeMarkLabel($, bitmaps, anchors, offsets);
+  const place = isGroupArea ? placeAreaLabel[method]($, bitmaps, avoidBaseMark, markIndex) : placeMarkLabel($, bitmaps, anchors, offsets, allowOverlap);
 
   // place all labels
   data.forEach(d => d.opacity = +place(d));
@@ -30806,6 +30825,12 @@ const Anchors = ['top-left', 'left', 'bottom-left', 'top', 'bottom', 'top-right'
  *   overlap with the underlying base mark being labeled.
  * @param {string} [params.method='naive'] - For area make labels only, a method for
  *   place labels. One of 'naive', 'reduced-search', or 'floodfill'.
+ * @param {boolean} [params.overlap=false] - Boolean flag indicating if every label should be
+ *   placed, whatever it overlaps. Anchors are then tested only against the layout bounds, and
+ *   a label that fits at none takes the first. Does not apply to group area marks.
+ * @param {function(object): *} [params.mirror] - An optional predicate expression function over
+ *   the text mark item. Where it is truthy the label's anchors are mirrored through the center of
+ *   its base mark, so 'top' becomes 'bottom'.
  * @param {Array<string>} [params.as] - The output fields written by the transform.
  *   The default is ['x', 'y', 'opacity', 'align', 'baseline'].
  */
@@ -30863,6 +30888,13 @@ Label$1.Definition = {
     type: 'string',
     default: 'naive'
   }, {
+    name: 'overlap',
+    type: 'boolean',
+    default: false
+  }, {
+    name: 'mirror',
+    type: 'expr'
+  }, {
     name: 'as',
     type: 'string',
     array: true,
@@ -30877,14 +30909,14 @@ inherits(Label$1, Transform, {
       return isFunction(p) && pulse.modified(p.fields);
     }
     const mod = _.modified();
-    if (!(mod || pulse.changed(pulse.ADD_REM) || modp('sort'))) return;
+    if (!(mod || pulse.changed(pulse.ADD_REM) || modp('sort') || modp('mirror'))) return;
     if (!_.size || _.size.length !== 2) {
       error('Size parameter should be specified as a [width, height] array.');
     }
     const as = _.as || Output$1;
 
     // run label layout
-    labelLayout(pulse.materialize(pulse.SOURCE).source || [], _.size, _.sort, array$5(_.offset == null ? 1 : _.offset), array$5(_.anchor || Anchors), _.avoidMarks || [], _.avoidBaseMark !== false, _.lineAnchor || 'end', _.markIndex || 0, _.padding === undefined ? 0 : _.padding, _.method || 'naive').forEach(l => {
+    labelLayout(pulse.materialize(pulse.SOURCE).source || [], _.size, _.sort, array$5(_.offset == null ? 1 : _.offset), array$5(_.anchor || Anchors), _.avoidMarks || [], _.avoidBaseMark !== false, _.lineAnchor || 'end', _.markIndex || 0, _.padding === undefined ? 0 : _.padding, _.method || 'naive', !!_.overlap, _.mirror && (d => _.mirror(d, _))).forEach(l => {
       // write layout results to data stream
       const t = l.datum;
       t[as[0]] = l.x;
