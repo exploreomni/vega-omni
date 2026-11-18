@@ -31974,12 +31974,8 @@
               "fontSize": 8
             },
             {
-              "x": 315.5,
-              "y": 169.56521739130437,
-              "align": "left",
-              "baseline": "middle",
               "fill": "#000",
-              "opacity": 1,
+              "opacity": 0,
               "text": null,
               "font": "sans-serif",
               "fontSize": 8

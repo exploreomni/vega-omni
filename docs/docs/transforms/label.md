@@ -4,7 +4,7 @@ title: Label Transform
 permalink: /docs/transforms/label/index.html
 ---
 
-The **label** transform {% include tag ver="5.16" %} positions text marks so that they do not overlap with each other or with other marks in the chart. The label transform should be applied to a [`text` mark](../../marks/text) whose input data is the *base mark* to label. That is, the `text` mark labels should derive from another mark through [reactive geometry](../../marks/#reactivegeom). To label individual line or area marks (rather than each point they contain), the base mark should be a [`group` mark](../../marks/group) containing lines or areas to label.
+The **label** transform {% include tag ver="5.16" %} positions text marks so that they do not overlap with each other or with other marks in the chart. The label transform should be applied to a [`text` mark](../../marks/text) whose input data is the *base mark* to label. That is, the `text` mark labels should derive from another mark through [reactive geometry](../../marks/#reactivegeom). To label individual line or area marks (rather than each point they contain), the base mark should be a [`group` mark](../../marks/group) containing lines or areas to label. A text item with no text is not placed and takes no space, unless the base mark is a group mark containing areas.
 
 ## Transform Parameters
 
@@ -17,7 +17,9 @@ The **label** transform {% include tag ver="5.16" %} positions text marks so tha
 | lineAnchor    | {% include type t="String" %}      | The anchor position of labels for line marks, where one line receives one label. One of `"start"` or `"end"` (the default). This property only applies when the base mark is a group mark containing line marks. |
 | markIndex     | {% include type t="Number" %}      | The index of a mark in a group mark to use as the base mark (default `0`). When a group mark is used as base mark, *markIndex* is used to specify which mark in the group to label. This property only applies when the base mark is a group mark. |
 | method        | {% include type t="String" %}      | The labeling method to use for area marks. One of `'floodfill'`, `'reduced-search'`, and `'naive'` (default). This property only applies when the base mark is a group mark containing area marks. |
+| mirror        | {% include type t="Expr" %}        | A predicate [expression](../../expressions) over the text mark item, whose base mark item is `datum.datum`. Where it is truthy the label's anchors are mirrored through the center of its base mark, so `"top"` becomes `"bottom"` and `"top-left"` becomes `"bottom-right"`. Use it to label a bar with a negative value past its far end. |
 | offset        | {% include type t="Number|Number[]" %} | A list of label offsets (in pixels) for each anchor direction, relative to the base mark bounding box (defaults to `1` for all anchors). This property can be specified as a single number to indicate a constant offset. |
+| overlap       | {% include type t="Boolean" %}     | A boolean flag (default `false`) specifying if every label should be placed, whatever it overlaps. Anchors are then tested only against the chart bounding box, and a label that fits at none takes the first. This property does not apply when the base mark is a group mark containing area marks. |
 | padding       | {% include type t="Number" %}   | The padding in pixels (default `0`) by which a label may extend past the chart bounding box. |
 | sort          | {% include type t="Field" %}    | A field indicating the order in which labels should be placed, in ascending order. |
 | as            | {% include type t="String[]" %}     | The output fields written by the transform. The default is `['x', 'y', 'opacity', 'align', 'baseline']`. |

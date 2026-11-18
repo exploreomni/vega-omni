@@ -34,7 +34,7 @@ const placeAreaLabel = {
 };
 
 export default function(texts, size, compare, offset, anchor,
-  avoidMarks, avoidBaseMark, lineAnchor, markIndex, padding, method)
+  avoidMarks, avoidBaseMark, lineAnchor, markIndex, padding, method, overlap, mirror)
 {
   // early exit for empty data
   if (!texts.length) return texts;
@@ -47,7 +47,8 @@ export default function(texts, size, compare, offset, anchor,
         isGroupArea = grouptype === 'area',
         boundary = markBoundary(marktype, grouptype, lineAnchor, markIndex),
         infPadding = padding === null || padding === Infinity,
-        isNaiveGroupArea = isGroupArea && method === 'naive';
+        isNaiveGroupArea = isGroupArea && method === 'naive',
+        allowOverlap = overlap && !isGroupArea;
 
   let maxTextWidth = -1,
       maxTextHeight = -1;
@@ -66,6 +67,7 @@ export default function(texts, size, compare, offset, anchor,
       align: undefined,
       baseline: undefined,
       boundary: boundary(d),
+      mirror: !!(mirror && mirror(d)),
       textWidth
     };
   });
@@ -95,15 +97,17 @@ export default function(texts, size, compare, offset, anchor,
     const baseMark = ((marktype && avoidBaseMark) || isGroupArea) && texts.map(d => d.datum);
 
     // generate bitmaps for layout calculation
-    bitmaps = avoidMarks.length || baseMark
-      ? markBitmaps($, baseMark || [], avoidMarks, labelInside, isGroupArea)
-      : baseBitmaps($, avoidBaseMark && data);
+    // overlapping labels test the layout bounds only, so nothing is drawn
+    bitmaps = allowOverlap ? baseBitmaps($)
+      : avoidMarks.length || baseMark
+        ? markBitmaps($, baseMark || [], avoidMarks, labelInside, isGroupArea)
+        : baseBitmaps($, avoidBaseMark && data);
   }
 
   // generate label placement function
   const place = isGroupArea
     ? placeAreaLabel[method]($, bitmaps, avoidBaseMark, markIndex)
-    : placeMarkLabel($, bitmaps, anchors, offsets);
+    : placeMarkLabel($, bitmaps, anchors, offsets, allowOverlap);
 
   // place all labels
   data.forEach(d => d.opacity = +place(d));
